@@ -8,6 +8,7 @@ export type UpgradeLevel = {
   level: number;
   title: string;
   previewImage?: string;
+  previewVideo?: string;
   cost: number;
 };
 
@@ -28,6 +29,7 @@ export type ShopPayload = {
   featured: SkinOffer;
   daily: SkinOffer[];
   bundlePriceVP: number;
+  bundleImage: string;
   dailyResetAtISO: string;
 };
 
