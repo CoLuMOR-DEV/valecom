@@ -1,36 +1,45 @@
 # Valorant In-Game Shop Replica (Next.js + MySQL)
 
+## What is improved in this revision
+- Real DB-backed purchase persistence end-to-end on localhost (XAMPP MySQL).
+- Upgrade recommendation now uses MySQL function `CalculateUpgradeCost` via API.
+- UI reads live user VP/owned level state from DB instead of a hardcoded balance.
+- Purchase flow writes two transaction records (`TOPUP`, `UPGRADE`) and updates `OwnedSkins` + `Users.VP_Balance`.
+
 ## Architecture
 - **Frontend:** Next.js App Router + Tailwind + Framer Motion.
-- **Middleware Backend:** Next.js API routes (`/api/shop`, `/api/topup`, `/api/purchase`, `/api/admin/transactions`).
-- **Database:** MySQL via XAMPP locally; same code works with PlanetScale/Aiven by changing env vars.
+- **Backend middleware:** Next.js API routes.
+- **Database:** MySQL (XAMPP local) with production-ready env strategy for PlanetScale/Aiven.
 
-## Flow: Inspect -> Top-Up -> Upgrade
-1. Open store (`/`) and click skin card.
-2. Inspect modal opens with Level 1-4 + variants (only L1 unlocked).
-3. Selecting locked level shows deficit + **Unlock Level X** CTA.
-4. CTA redirects to `/topup` with contextual query state (`skinName`, `targetLevel`, `vpDeficit`, `vpCost`).
-5. Top-up page highlights recommended VP pack and runs 2-second animated checkout.
-6. Checkout calls `POST /api/topup`, then `POST /api/purchase` which triggers `ProcessUpgradePurchase`.
+## Localhost setup (XAMPP)
+1. Start Apache + MySQL in XAMPP.
+2. Open phpMyAdmin and run: `sql/init_valorant_shop.sql`.
+3. Copy env file and configure credentials:
+   ```bash
+   cp .env.example .env.local
+   ```
+4. Install and start:
+   ```bash
+   npm install
+   npm run dev
+   ```
+5. Open:
+   - `http://localhost:3000` (shop)
+   - `http://localhost:3000/admin` (admin table)
 
-## Database setup (XAMPP)
-1. Open phpMyAdmin.
-2. Run `sql/init_valorant_shop.sql`.
-3. Copy `.env.example` to `.env.local` and update credentials.
+## API map
+- `GET /api/shop` → featured + daily skin data from Valorant API.
+- `GET /api/user/1` → live VP balance + owned skins.
+- `POST /api/upgrade-cost` → calls `CalculateUpgradeCost`.
+- `POST /api/topup` → adds VP and logs TOPUP transaction.
+- `POST /api/purchase` → calls `ProcessUpgradePurchase` (deduct VP, unlock level, log UPGRADE).
+- `GET /api/admin/transactions` → admin table rows.
 
-## Production MySQL strategy (Vercel)
-- **PlanetScale:** serverless-compatible, branch-based schema workflow.
-- **Aiven MySQL:** managed MySQL with SSL and static host.
-- Set Vercel env vars (`MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE`).
-- Optional: route DB calls through private network/Vercel secure connection if provider supports it.
-
-## Scripts
-```bash
-npm install
-npm run dev
-npm run build
-```
-
-## Hardcoded admin route
+## Admin route
 - Path: `/admin`
 - Password: `VALO_ADMIN_2026`
+
+## Production MySQL strategy for Vercel
+- PlanetScale or Aiven can be used by setting:
+  `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE`.
+- Keep API code unchanged; only env vars differ by environment.

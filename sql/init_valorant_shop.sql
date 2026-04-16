@@ -4,6 +4,7 @@ USE valorant_shop;
 
 CREATE TABLE IF NOT EXISTS Users (
   ID INT PRIMARY KEY AUTO_INCREMENT,
+  Username VARCHAR(50) NOT NULL UNIQUE,
   VP_Balance INT NOT NULL DEFAULT 0,
   CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -24,7 +25,7 @@ CREATE TABLE IF NOT EXISTS Transactions (
   SkinID VARCHAR(100) NOT NULL,
   PurchasedLevel INT NOT NULL,
   VP_Cost INT NOT NULL,
-  TransactionType ENUM('UPGRADE','TOPUP') NOT NULL DEFAULT 'UPGRADE',
+  TransactionType ENUM('UPGRADE', 'TOPUP') NOT NULL DEFAULT 'UPGRADE',
   CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_tx_user FOREIGN KEY (UserID) REFERENCES Users(ID)
 );
@@ -36,14 +37,20 @@ CREATE TABLE IF NOT EXISTS UpgradePricing (
   PRIMARY KEY (SkinID, Level)
 );
 
-INSERT IGNORE INTO Users (ID, VP_Balance) VALUES (1, 350);
+INSERT IGNORE INTO Users (ID, Username, VP_Balance) VALUES
+(1, 'demo_user', 350),
+(2, 'admin_user', 5000);
 
--- Sample level prices for Holo Meridian Operator
+-- Per-level cumulative pricing examples
 INSERT IGNORE INTO UpgradePricing (SkinID, Level, VP_Cost) VALUES
 ('holo-meridian-operator', 1, 0),
 ('holo-meridian-operator', 2, 500),
 ('holo-meridian-operator', 3, 750),
-('holo-meridian-operator', 4, 1000);
+('holo-meridian-operator', 4, 1000),
+('ion-operator', 1, 0),
+('ion-operator', 2, 400),
+('ion-operator', 3, 700),
+('ion-operator', 4, 900);
 
 DELIMITER $$
 
@@ -65,12 +72,18 @@ READS SQL DATA
 DETERMINISTIC
 BEGIN
   DECLARE current_level INT DEFAULT 1;
+  DECLARE current_cost INT DEFAULT 0;
   DECLARE target_cost INT DEFAULT 0;
 
   SELECT IFNULL(LevelUnlocked, 1)
     INTO current_level
   FROM OwnedSkins
   WHERE UserID = p_user_id AND SkinID = p_skin_id;
+
+  SELECT IFNULL(VP_Cost, 0)
+    INTO current_cost
+  FROM UpgradePricing
+  WHERE SkinID = p_skin_id AND Level = current_level;
 
   SELECT IFNULL(VP_Cost, 0)
     INTO target_cost
@@ -81,7 +94,7 @@ BEGIN
     RETURN 0;
   END IF;
 
-  RETURN target_cost;
+  RETURN GREATEST(target_cost - current_cost, 0);
 END $$
 
 DROP PROCEDURE IF EXISTS ProcessUpgradePurchase $$
@@ -93,6 +106,12 @@ CREATE PROCEDURE ProcessUpgradePurchase(
 )
 BEGIN
   DECLARE current_vp INT;
+
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+    RESIGNAL;
+  END;
 
   START TRANSACTION;
 

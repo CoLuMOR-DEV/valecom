@@ -5,8 +5,8 @@ export async function POST(request: NextRequest) {
   try {
     const { userId, vpAmount } = await request.json();
 
-    if (!userId || !vpAmount) {
-      return NextResponse.json({ error: 'userId and vpAmount required' }, { status: 400 });
+    if (!userId || !vpAmount || Number(vpAmount) <= 0) {
+      return NextResponse.json({ error: 'userId and positive vpAmount required' }, { status: 400 });
     }
 
     await pool.query('UPDATE Users SET VP_Balance = VP_Balance + ? WHERE ID = ?', [
@@ -20,7 +20,10 @@ export async function POST(request: NextRequest) {
       [Number(userId), Number(vpAmount)]
     );
 
-    return NextResponse.json({ ok: true });
+    const [vpRows] = await pool.query('SELECT CheckTotalVP(?) AS vp', [Number(userId)]);
+    const vpBalance = Number((vpRows as Array<{ vp: number }>)[0]?.vp ?? 0);
+
+    return NextResponse.json({ ok: true, vpBalance });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Top-up error';
     return NextResponse.json({ error: message }, { status: 500 });

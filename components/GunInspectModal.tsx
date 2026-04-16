@@ -1,27 +1,46 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { SkinOffer } from '@/types/shop';
 
 type Props = {
   offer: SkinOffer;
+  userId: number;
   userVP: number;
+  ownedLevel: number;
   onClose: () => void;
 };
 
-export default function GunInspectModal({ offer, userVP, onClose }: Props) {
+export default function GunInspectModal({ offer, userId, userVP, ownedLevel, onClose }: Props) {
   const router = useRouter();
-  const [selectedLevel, setSelectedLevel] = useState(1);
+  const [selectedLevel, setSelectedLevel] = useState(ownedLevel);
   const [variantId, setVariantId] = useState(offer.variants[0]?.id);
+  const [upgradeCost, setUpgradeCost] = useState(0);
+  const [deficit, setDeficit] = useState(0);
 
-  const locked = selectedLevel > 1;
-  const selectedCost = useMemo(() => offer.levels.find((l) => l.level === selectedLevel)?.cost ?? 0, [offer, selectedLevel]);
-  const deficit = Math.max(0, selectedCost - userVP);
+  const locked = selectedLevel > ownedLevel;
+
+  useEffect(() => {
+    fetch('/api/upgrade-cost', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, skinId: offer.skinId, targetLevel: selectedLevel })
+    })
+      .then((res) => res.json())
+      .then((json) => {
+        setUpgradeCost(json.cost ?? 0);
+        setDeficit(json.deficit ?? 0);
+      })
+      .catch(() => {
+        setUpgradeCost(0);
+        setDeficit(0);
+      });
+  }, [userId, offer.skinId, selectedLevel]);
 
   const handleUnlock = () => {
     router.push(
-      `/topup?skinId=${offer.skinId}&skinName=${encodeURIComponent(offer.skinName)}&targetLevel=${selectedLevel}&vpDeficit=${deficit}&vpCost=${selectedCost}`
+      `/topup?userId=${userId}&skinId=${offer.skinId}&skinName=${encodeURIComponent(offer.skinName)}&targetLevel=${selectedLevel}&vpDeficit=${deficit}&vpCost=${upgradeCost}`
     );
   };
 
@@ -40,16 +59,17 @@ export default function GunInspectModal({ offer, userVP, onClose }: Props) {
           <div>
             <p className="mb-2 text-sm text-slate-300">Levels</p>
             <div className="grid grid-cols-4 gap-2">
-              {offer.levels.map((level) => (
+              {[1, 2, 3, 4].map((level) => (
                 <button
-                  key={level.level}
-                  onClick={() => setSelectedLevel(level.level)}
-                  className={`rounded border px-3 py-2 ${selectedLevel === level.level ? 'border-valorant-mint text-valorant-mint' : 'border-slate-600'}`}
+                  key={level}
+                  onClick={() => setSelectedLevel(level)}
+                  className={`rounded border px-3 py-2 ${selectedLevel === level ? 'border-valorant-mint text-valorant-mint' : 'border-slate-600'}`}
                 >
-                  L{level.level}
+                  L{level}
                 </button>
               ))}
             </div>
+            <p className="mt-2 text-xs text-slate-400">Current unlocked level: {ownedLevel}</p>
           </div>
 
           <div>
@@ -70,7 +90,7 @@ export default function GunInspectModal({ offer, userVP, onClose }: Props) {
           {locked ? (
             <div className="mt-4 rounded border border-amber-400/40 bg-amber-900/20 p-3">
               <p className="mb-2 text-sm uppercase text-amber-200">Level {selectedLevel} locked</p>
-              <p className="text-xs text-slate-300">Cost: {selectedCost} VP · You have: {userVP} VP · Deficit: {deficit} VP</p>
+              <p className="text-xs text-slate-300">Cost: {upgradeCost} VP · You have: {userVP} VP · Deficit: {deficit} VP</p>
               <button
                 onClick={handleUnlock}
                 className="mt-3 w-full rounded bg-valorant-accent py-2 text-sm font-semibold uppercase"
@@ -79,7 +99,7 @@ export default function GunInspectModal({ offer, userVP, onClose }: Props) {
               </button>
             </div>
           ) : (
-            <p className="mt-2 text-valorant-mint">Level 1 unlocked by default.</p>
+            <p className="mt-2 text-valorant-mint">This level is already unlocked.</p>
           )}
         </div>
       </div>

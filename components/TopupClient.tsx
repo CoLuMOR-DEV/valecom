@@ -16,6 +16,7 @@ const VP_PACKS = [
 export default function TopupClient() {
   const params = useSearchParams();
   const router = useRouter();
+  const userId = Number(params.get('userId') ?? 1);
   const skinName = params.get('skinName') ?? 'Selected Skin';
   const skinId = params.get('skinId') ?? '';
   const targetLevel = Number(params.get('targetLevel') ?? 4);
@@ -25,24 +26,38 @@ export default function TopupClient() {
   const recommended = useMemo(() => VP_PACKS.find((p) => p.vp >= vpDeficit) ?? VP_PACKS[VP_PACKS.length - 1], [vpDeficit]);
   const [selectedVP, setSelectedVP] = useState<number>(recommended.vp);
   const [state, setState] = useState<'idle' | 'processing' | 'success'>('idle');
+  const [error, setError] = useState('');
 
   const handleCheckout = async () => {
+    setError('');
     setState('processing');
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    await fetch('/api/topup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: 1, vpAmount: selectedVP })
-    });
 
-    await fetch('/api/purchase', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: 1, skinId, level: targetLevel, vpCost })
-    });
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    setState('success');
-    setTimeout(() => router.push('/'), 1200);
+      await fetch('/api/topup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, vpAmount: selectedVP })
+      });
+
+      const purchaseRes = await fetch('/api/purchase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, skinId, level: targetLevel, vpCost })
+      });
+
+      const purchaseJson = await purchaseRes.json();
+      if (!purchaseRes.ok) {
+        throw new Error(purchaseJson.error ?? 'Purchase failed');
+      }
+
+      setState('success');
+      setTimeout(() => router.push('/'), 1200);
+    } catch (e) {
+      setState('idle');
+      setError(e instanceof Error ? e.message : 'Checkout failed');
+    }
   };
 
   return (
@@ -73,6 +88,8 @@ export default function TopupClient() {
       <div className="mt-8">
         <CheckoutAnimation state={state} />
       </div>
+
+      {error && <p className="mt-3 text-center text-sm text-red-400">{error}</p>}
 
       <button
         onClick={handleCheckout}

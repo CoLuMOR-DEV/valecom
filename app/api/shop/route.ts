@@ -60,6 +60,10 @@ export async function GET() {
       }
     }
 
+    if (found.length === 0) {
+      return NextResponse.json({ error: 'No shop skins found from API' }, { status: 502 });
+    }
+
     const fallback = found[0];
 
     return NextResponse.json({
