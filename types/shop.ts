@@ -24,6 +24,13 @@ export type SkinOffer = {
   levels: UpgradeLevel[];
 };
 
+export type ShopPayload = {
+  featured: SkinOffer;
+  daily: SkinOffer[];
+  bundlePriceVP: number;
+  dailyResetAtISO: string;
+};
+
 export type PurchasePayload = {
   userId: number;
   skinId: string;

@@ -7,9 +7,10 @@
 }
 
 body {
-  @apply bg-store-radial text-white min-h-screen;
-}
-
-.valorant-card {
-  @apply border border-slate-300/40 bg-slate-900/50 backdrop-blur-sm;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(34, 91, 170, 0.4), transparent 35%),
+    radial-gradient(circle at 80% 50%, rgba(163, 37, 87, 0.26), transparent 40%),
+    linear-gradient(180deg, #091120 0%, #060b15 70%, #04060c 100%);
+  color: #fff;
 }

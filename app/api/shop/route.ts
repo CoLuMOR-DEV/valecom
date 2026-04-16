@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
-import type { SkinOffer } from '@/types/shop';
+import type { SkinOffer, ShopPayload } from '@/types/shop';
 
 type ApiSkin = {
   uuid: string;
   displayName: string;
   displayIcon?: string;
-  contentTierUuid?: string;
   chromas: Array<{ uuid: string; displayName: string; swatch?: string }>;
-  levels: Array<{ uuid: string; displayName: string; streamedVideo?: string; displayIcon?: string }>;
+  levels: Array<{ uuid: string; displayName: string; displayIcon?: string }>;
 };
 
 type ApiWeapon = {
@@ -17,16 +16,25 @@ type ApiWeapon = {
 
 const iconicNames = ['Holo Meridian Operator', 'Ion Operator', 'Reaver Vandal', 'Sakura Sheriff', 'Neptune Odin'];
 
+const vpBySkinName: Record<string, number> = {
+  'Ion Operator': 1775,
+  'Reaver Vandal': 1775,
+  'Sakura Sheriff': 1275,
+  'Neptune Odin': 1775,
+  'Holo Meridian Operator': 2175
+};
+
 function toOffer(skin: ApiSkin, weaponName: string, featured = false): SkinOffer {
+  const baseName = iconicNames.find((name) => skin.displayName.toLowerCase().includes(name.toLowerCase())) ?? skin.displayName;
   return {
     skinId: skin.uuid,
-    skinName: skin.displayName,
+    skinName: baseName,
     weaponName,
     displayIcon: skin.displayIcon ?? '',
     showcaseImage: skin.levels?.[0]?.displayIcon ?? skin.displayIcon ?? '',
-    priceVP: featured ? 2175 : 1775,
+    priceVP: vpBySkinName[baseName] ?? (featured ? 2175 : 1775),
     featured,
-    collectionName: featured ? 'Holo Meridian Collection' : undefined,
+    collectionName: featured ? 'HOLO MERIDIAN' : undefined,
     variants: (skin.chromas ?? []).slice(0, 4).map((c, index) => ({
       id: c.uuid,
       name: c.displayName || `Variant ${index + 1}`,
@@ -36,9 +44,17 @@ function toOffer(skin: ApiSkin, weaponName: string, featured = false): SkinOffer
       level,
       title: `Level ${level}`,
       previewImage: skin.levels?.[Math.min(level - 1, (skin.levels?.length ?? 1) - 1)]?.displayIcon,
-      cost: level === 1 ? 0 : 250 * level
+      cost: [0, 500, 750, 1000][level - 1] ?? 0
     }))
   };
+}
+
+function nextDailyResetISO(): string {
+  const now = new Date();
+  const target = new Date(now);
+  target.setUTCHours(0, 0, 0, 0);
+  target.setUTCDate(target.getUTCDate() + 1);
+  return target.toISOString();
 }
 
 export async function GET() {
@@ -64,12 +80,14 @@ export async function GET() {
       return NextResponse.json({ error: 'No shop skins found from API' }, { status: 502 });
     }
 
-    const fallback = found[0];
+    const payload: ShopPayload = {
+      featured: found.find((s) => s.skinName.toLowerCase().includes('holo meridian')) ?? found[0],
+      daily: found.filter((s) => !s.skinName.toLowerCase().includes('holo meridian')).slice(0, 4),
+      bundlePriceVP: 8700,
+      dailyResetAtISO: nextDailyResetISO()
+    };
 
-    return NextResponse.json({
-      featured: found.find((s) => s.skinName.toLowerCase().includes('holo meridian')) ?? fallback,
-      daily: found.filter((s) => !s.skinName.toLowerCase().includes('holo meridian')).slice(0, 4)
-    });
+    return NextResponse.json(payload);
   } catch {
     return NextResponse.json({ error: 'Failed to fetch shop data' }, { status: 500 });
   }
