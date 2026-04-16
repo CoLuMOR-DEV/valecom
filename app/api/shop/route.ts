@@ -30,6 +30,11 @@ type ApiWeapon = {
   skins: ApiSkin[];
 };
 
+type ApiCurrency = {
+  displayName: string;
+  displayIcon?: string;
+};
+
 type BundleSpec = {
   name: string;
   aliases: string[];
@@ -169,29 +174,32 @@ function nextDailyResetISO(): string {
 }
 
 function buildPayload(allOffers: SkinOffer[], seed: number): ShopPayload {
-  const bundles = resolveBundleOffers(allOffers);
-  const availableBundles = bundles.filter((b) => b.available);
-  const featuredBundle = availableBundles[0] || bundles[0];
+  const bundles = seededShuffle(resolveBundleOffers(allOffers).filter((b) => b.available), seed).slice(0, 6);
+  const featuredBundle = bundles[0];
 
-  const bundleSkinSet = new Set(availableBundles.flatMap((b) => b.skinIds));
+  const bundleSkinSet = new Set(bundles.flatMap((b) => b.skinIds));
   const dailyPool = allOffers.filter((offer) => !bundleSkinSet.has(offer.skinId));
   const shuffled = seededShuffle(dailyPool, seed);
+  const shuffledCatalog = seededShuffle(allOffers, seed + 17);
 
   const featured = shuffled[0] || allOffers[0];
 
   return {
     featured,
-    featuredBundle,
+    featuredBundle: featuredBundle || {
+      id: 'featured-fallback',
+      name: 'Featured Collection',
+      displayIcon: featured.showcaseImage,
+      priceVP: 8700,
+      skinIds: [featured.skinId],
+      available: true
+    },
     bundles,
-    daily: shuffled.slice(0, 8),
-    catalog: shuffled.slice(0, 72),
-    bundlePriceVP: featuredBundle?.priceVP ?? 8700,
+    daily: shuffled.slice(0, 4),
+    catalog: shuffledCatalog.slice(0, 72),
     bundleImage: featuredBundle?.displayIcon || featured.showcaseImage,
+    vpIcon: 'https://media.valorant-api.com/currencies/85ad13f7-3d1b-5128-9eb2-7cd8a00f8d1b/displayicon.png',
     dailyResetAtISO: nextDailyResetISO(),
-    requestedBundleCoverage: {
-      available: bundles.filter((bundle) => bundle.available).map((bundle) => bundle.name),
-      missing: bundles.filter((bundle) => !bundle.available).map((bundle) => bundle.name)
-    }
   };
 }
 
@@ -214,7 +222,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Could not generate enough shop skins from API.' }, { status: 502 });
     }
 
-    return NextResponse.json(buildPayload(offers, seed));
+    const payload = buildPayload(offers, seed);
+
+    try {
+      const currenciesRes = await fetch('https://valorant-api.com/v1/currencies', { next: { revalidate: 900 } });
+      const currenciesJson = await currenciesRes.json();
+      const currencies: ApiCurrency[] = currenciesJson.data || [];
+      const vp = currencies.find((currency) => normalize(currency.displayName).includes('valorant points'));
+      payload.vpIcon = vp?.displayIcon || payload.vpIcon;
+    } catch {
+      // Keep fallback VP icon URL.
+    }
+
+    return NextResponse.json(payload);
   } catch {
     return NextResponse.json({ error: 'Failed to fetch Valorant API.' }, { status: 500 });
   }

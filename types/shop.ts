@@ -41,13 +41,9 @@ export type ShopPayload = {
   bundles: BundleOffer[];
   daily: SkinOffer[];
   catalog: SkinOffer[];
-  bundlePriceVP: number;
   bundleImage: string;
+  vpIcon: string;
   dailyResetAtISO: string;
-  requestedBundleCoverage: {
-    available: string[];
-    missing: string[];
-  };
 };
 
 export type PurchasePayload = {

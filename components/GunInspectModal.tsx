@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { SkinOffer } from '@/types/shop';
+import PurchaseCompleteModal from './PurchaseCompleteModal';
 
 type Props = {
   offer: SkinOffer;
@@ -20,6 +21,7 @@ export default function GunInspectModal({ offer, userId, userVP, ownedLevel, onC
   const [deficit, setDeficit] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [showPurchased, setShowPurchased] = useState(false);
 
   const locked = selectedLevel > ownedLevel;
   const levelMeta = useMemo(() => offer.levels.find((l) => l.level === selectedLevel), [offer.levels, selectedLevel]);
@@ -75,7 +77,7 @@ export default function GunInspectModal({ offer, userId, userVP, ownedLevel, onC
         throw new Error(json.error ?? 'Purchase failed');
       }
 
-      onClose();
+      setShowPurchased(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Buy skin failed');
     } finally {
@@ -84,6 +86,7 @@ export default function GunInspectModal({ offer, userId, userVP, ownedLevel, onC
   };
 
   return (
+    <>
     <div className="fixed inset-0 z-50 bg-black/80 p-6 backdrop-blur-sm">
       <div className="mx-auto grid h-full max-w-6xl grid-cols-12 gap-4 rounded-lg border border-slate-200/20 bg-[#070c16] p-4">
         <div className="col-span-8 flex flex-col gap-2">
@@ -160,5 +163,14 @@ export default function GunInspectModal({ offer, userId, userVP, ownedLevel, onC
         </div>
       </div>
     </div>
+    {showPurchased ? (
+      <PurchaseCompleteModal
+        title={offer.skinName}
+        subtitle={`Purchased · ${offer.weaponName}`}
+        image={selectedVariant?.displayIcon || levelMeta?.previewImage || offer.showcaseImage}
+        onClose={onClose}
+      />
+    ) : null}
+    </>
   );
 }
