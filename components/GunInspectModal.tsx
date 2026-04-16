@@ -14,13 +14,16 @@ type Props = {
 
 export default function GunInspectModal({ offer, userId, userVP, ownedLevel, onClose }: Props) {
   const router = useRouter();
-  const [selectedLevel, setSelectedLevel] = useState(ownedLevel);
+  const [selectedLevel, setSelectedLevel] = useState(Math.max(1, ownedLevel));
   const [variantId, setVariantId] = useState(offer.variants[0]?.id);
   const [upgradeCost, setUpgradeCost] = useState(0);
   const [deficit, setDeficit] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
   const locked = selectedLevel > ownedLevel;
   const levelMeta = useMemo(() => offer.levels.find((l) => l.level === selectedLevel), [offer.levels, selectedLevel]);
+  const selectedVariant = offer.variants.find((variant) => variant.id === variantId) ?? offer.variants[0];
 
   useEffect(() => {
     fetch('/api/upgrade-cost', {
@@ -45,12 +48,49 @@ export default function GunInspectModal({ offer, userId, userVP, ownedLevel, onC
     );
   };
 
+  const handleBuySkin = async () => {
+    setError('');
+    if (ownedLevel >= 1) {
+      setError('Skin already owned. Use Unlock Level for upgrades.');
+      return;
+    }
+
+    if (userVP < offer.priceVP) {
+      router.push(
+        `/topup?userId=${userId}&skinId=${offer.skinId}&skinName=${encodeURIComponent(offer.skinName)}&targetLevel=1&vpDeficit=${offer.priceVP - userVP}&vpCost=${offer.priceVP}`
+      );
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const res = await fetch('/api/purchase-skin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, skinId: offer.skinId, vpCost: offer.priceVP })
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? 'Purchase failed');
+      }
+
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Buy skin failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 p-6">
+    <div className="fixed inset-0 z-50 bg-black/80 p-6 backdrop-blur-sm">
       <div className="mx-auto grid h-full max-w-6xl grid-cols-12 gap-4 rounded-lg border border-slate-200/20 bg-[#070c16] p-4">
         <div className="col-span-8 flex flex-col gap-2">
           <div className="flex items-center justify-between px-1 text-xs uppercase tracking-wider text-slate-300">
-            <p>{offer.skinName} Level {selectedLevel}</p>
+            <p>
+              {offer.skinName} · {selectedVariant?.name || 'Default'} · Level {selectedLevel}
+            </p>
             <button onClick={onClose}>✕</button>
           </div>
 
@@ -58,24 +98,21 @@ export default function GunInspectModal({ offer, userId, userVP, ownedLevel, onC
             {levelMeta?.previewVideo ? (
               <video key={levelMeta.previewVideo} src={levelMeta.previewVideo} controls autoPlay muted loop className="h-full w-full object-cover" />
             ) : (
-              <img src={levelMeta?.previewImage || offer.showcaseImage} alt={offer.skinName} className="h-full w-full object-cover" />
+              <img src={selectedVariant?.displayIcon || levelMeta?.previewImage || offer.showcaseImage} alt={offer.skinName} className="h-full w-full object-contain" />
             )}
           </div>
 
-          <div className="grid grid-cols-4 gap-2">
-            {[1, 2, 3, 4].map((lvl) => {
-              const lmeta = offer.levels.find((l) => l.level === lvl);
-              return (
-                <button
-                  key={lvl}
-                  onClick={() => setSelectedLevel(lvl)}
-                  className={`h-20 border ${selectedLevel === lvl ? 'border-cyan-300' : 'border-slate-600'} bg-slate-900/50`}
-                >
-                  <p className="text-xs uppercase">Level {lvl}</p>
-                  <p className="text-[10px] text-slate-400">{lmeta?.cost ?? 0} VP</p>
-                </button>
-              );
-            })}
+          <div className="grid grid-cols-5 gap-2">
+            {offer.levels.map((lvl) => (
+              <button
+                key={lvl.level}
+                onClick={() => setSelectedLevel(lvl.level)}
+                className={`h-20 border ${selectedLevel === lvl.level ? 'border-cyan-300' : 'border-slate-600'} bg-slate-900/50`}
+              >
+                <p className="text-xs uppercase">Level {lvl.level}</p>
+                <p className="text-[10px] text-slate-400">{lvl.cost} VP</p>
+              </button>
+            ))}
           </div>
         </div>
 
@@ -84,15 +121,18 @@ export default function GunInspectModal({ offer, userId, userVP, ownedLevel, onC
 
           <div>
             <p className="mb-2 text-sm text-slate-300">Variants</p>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {offer.variants.map((variant) => (
                 <button
                   key={variant.id}
                   onClick={() => setVariantId(variant.id)}
-                  className={`h-10 rounded border ${variantId === variant.id ? 'border-cyan-300' : 'border-slate-700'}`}
-                  style={{ background: variant.swatch || '#334155' }}
-                  title={variant.name}
-                />
+                  className={`rounded border p-2 text-left ${variantId === variant.id ? 'border-cyan-300' : 'border-slate-700'}`}
+                >
+                  <div className="mb-2 h-12 overflow-hidden rounded bg-slate-900/60">
+                    {variant.displayIcon ? <img src={variant.displayIcon} alt={variant.name} className="h-full w-full object-contain" /> : null}
+                  </div>
+                  <p className="truncate text-xs">{variant.name}</p>
+                </button>
               ))}
             </div>
           </div>
@@ -106,10 +146,17 @@ export default function GunInspectModal({ offer, userId, userVP, ownedLevel, onC
               </button>
             </div>
           ) : (
-            <div className="rounded border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">This level is already unlocked.</div>
+            <div className="rounded border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">Current selected level is unlocked.</div>
           )}
 
-          <button className="rounded border-2 border-slate-100 bg-[#ece9df] py-3 text-black">BUY SKIN · {offer.priceVP} VP</button>
+          <button
+            onClick={handleBuySkin}
+            disabled={busy}
+            className="rounded border-2 border-slate-100 bg-[#ece9df] py-3 text-black disabled:opacity-60"
+          >
+            {busy ? 'PROCESSING...' : `BUY SKIN · ${offer.priceVP} VP`}
+          </button>
+          {error ? <p className="text-xs text-red-300">{error}</p> : null}
         </div>
       </div>
     </div>
