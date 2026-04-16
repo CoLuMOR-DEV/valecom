@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import GunInspectModal from './GunInspectModal';
 import PurchaseCompleteModal from './PurchaseCompleteModal';
 import type { ShopPayload, SkinOffer } from '@/types/shop';
@@ -24,6 +25,7 @@ function formatRemaining(ms: number) {
 }
 
 export default function ShopGrid() {
+  const router = useRouter();
   const [data, setData] = useState<ShopPayload | null>(null);
   const [selected, setSelected] = useState<SkinOffer | null>(null);
   const [userData, setUserData] = useState<UserResponse>(fallbackUser);
@@ -105,6 +107,9 @@ export default function ShopGrid() {
           <div className="flex items-center gap-2">
             <button className="rounded border border-cyan-400/60 bg-cyan-500/15 px-3 py-1 text-xs uppercase tracking-widest">Daily Offers</button>
             <button disabled className="cursor-not-allowed rounded border border-slate-600/60 bg-slate-900/50 px-3 py-1 text-xs uppercase tracking-widest text-slate-500">Bundle Shop</button>
+            <button onClick={() => router.push(`/topup?userId=${userId}`)} className="rounded border border-emerald-400/60 bg-emerald-500/10 px-3 py-1 text-xs uppercase tracking-widest text-emerald-100">
+              Top Up VP
+            </button>
             <button onClick={refreshStore} className="rounded border border-slate-400/70 bg-black/30 px-3 py-1 text-xs uppercase tracking-widest">Refresh</button>
             <p className="inline-flex items-center gap-2 rounded border border-cyan-400/50 bg-cyan-500/10 px-3 py-1 text-xs">
               <VpLogo icon={data.vpIcon} /> {userData.user?.VP_Balance ?? 0}

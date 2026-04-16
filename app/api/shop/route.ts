@@ -30,6 +30,12 @@ type ApiWeapon = {
   skins: ApiSkin[];
 };
 
+type ApiContentTier = {
+  uuid: string;
+  devName?: string;
+  displayName?: string;
+};
+
 type ApiCurrency = {
   displayName: string;
   displayIcon?: string;
@@ -80,9 +86,17 @@ function normalize(str: string): string {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-function skinPrice(name: string): number {
+function skinPrice(name: string, tierName?: string): number {
+  const tier = normalize(tierName || '');
+  if (tier.includes('select')) return 875;
+  if (tier.includes('deluxe')) return 1275;
+  if (tier.includes('premium')) return 1775;
+  if (tier.includes('exclusive')) return 2175;
+  if (tier.includes('ultra')) return 2475;
+
   const n = normalize(name);
-  if (n.includes('exclusive') || n.includes('champions') || n.includes('spectrum')) return 2675;
+  if (n.includes('champions') || n.includes('spectrum')) return 2675;
+  if (n.includes('exclusive')) return 2175;
   if (n.includes('ultra') || n.includes('elderflame')) return 2475;
   if (n.includes('premium') || n.includes('prime') || n.includes('reaver') || n.includes('kuronami')) return 1775;
   if (n.includes('deluxe')) return 1275;
@@ -113,7 +127,7 @@ function buildLevels(skin: ApiSkin) {
   });
 }
 
-function toOffer(skin: ApiSkin, weaponName: string): SkinOffer {
+function toOffer(skin: ApiSkin, weaponName: string, tierName?: string): SkinOffer {
   const variants = (skin.chromas || [])
     .slice(0, 4)
     .map((c, idx) => ({
@@ -133,7 +147,7 @@ function toOffer(skin: ApiSkin, weaponName: string): SkinOffer {
     weaponName,
     displayIcon: skin.displayIcon || skin.levels?.[0]?.displayIcon || '',
     showcaseImage: skin.wallpaper || skin.levels?.[0]?.displayIcon || skin.displayIcon || '',
-    priceVP: skinPrice(skin.displayName),
+    priceVP: skinPrice(skin.displayName, tierName),
     collectionName: skin.displayName.split(' ')[0],
     variants: ensuredVariants,
     levels: buildLevels(skin)
@@ -142,7 +156,6 @@ function toOffer(skin: ApiSkin, weaponName: string): SkinOffer {
 
 function isStandardWeaponSkin(skin: ApiSkin): boolean {
   const name = normalize(skin.displayName);
-  if (!skin.displayIcon) return false;
   if (name.includes('standard') || name.includes('random favorite')) return false;
   return true;
 }
@@ -174,7 +187,7 @@ function nextDailyResetISO(): string {
 }
 
 function buildPayload(allOffers: SkinOffer[], seed: number): ShopPayload {
-  const bundles = seededShuffle(resolveBundleOffers(allOffers).filter((b) => b.available), seed).slice(0, 6);
+  const bundles = resolveBundleOffers(allOffers).filter((b) => b.available);
   const featuredBundle = bundles[0];
 
   const bundleSkinSet = new Set(bundles.flatMap((b) => b.skinIds));
@@ -206,17 +219,21 @@ function buildPayload(allOffers: SkinOffer[], seed: number): ShopPayload {
 export async function GET(request: NextRequest) {
   const seed = Number(request.nextUrl.searchParams.get('seed') ?? Date.now());
   try {
-    const response = await fetch('https://valorant-api.com/v1/weapons', { next: { revalidate: 900 } });
-    const json = await response.json();
-    const weapons: ApiWeapon[] = json.data || [];
+    const [weaponsRes, tiersRes] = await Promise.all([
+      fetch('https://valorant-api.com/v1/weapons', { next: { revalidate: 900 } }),
+      fetch('https://valorant-api.com/v1/contenttiers', { next: { revalidate: 900 } })
+    ]);
+    const [weaponsJson, tiersJson] = await Promise.all([weaponsRes.json(), tiersRes.json()]);
+    const weapons: ApiWeapon[] = weaponsJson.data || [];
+    const tiers: ApiContentTier[] = tiersJson.data || [];
+    const tierLookup = new Map(tiers.map((tier) => [tier.uuid, tier.devName || tier.displayName || '']));
 
     const offers = weapons
       .flatMap((weapon) =>
         (weapon.skins || [])
           .filter(isStandardWeaponSkin)
-          .map((skin) => toOffer(skin, weapon.displayName))
-      )
-      .slice(0, 120);
+          .map((skin) => toOffer(skin, weapon.displayName, tierLookup.get(skin.contentTierUuid || '')))
+      );
 
     if (offers.length < 20) {
       return NextResponse.json({ error: 'Could not generate enough shop skins from API.' }, { status: 502 });

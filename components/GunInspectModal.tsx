@@ -66,6 +66,8 @@ export default function GunInspectModal({ offer, userId, userVP, ownedLevel, onC
 
     setBusy(true);
     try {
+      await new Promise((resolve) => setTimeout(resolve, 900));
+
       const res = await fetch('/api/purchase-skin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -158,6 +160,12 @@ export default function GunInspectModal({ offer, userId, userVP, ownedLevel, onC
             className="rounded border-2 border-slate-100 bg-[#ece9df] py-3 text-black disabled:opacity-60"
           >
             {busy ? 'PROCESSING...' : `BUY SKIN · ${offer.priceVP} VP`}
+          </button>
+          <button
+            onClick={() => router.push(`/topup?userId=${userId}&skinId=${offer.skinId}&skinName=${encodeURIComponent(offer.skinName)}&targetLevel=1&vpDeficit=${Math.max(0, offer.priceVP - userVP)}&vpCost=${offer.priceVP}`)}
+            className="rounded border border-cyan-300/60 bg-cyan-500/10 py-2 text-xs font-semibold uppercase tracking-wider text-cyan-100"
+          >
+            Top Up VP
           </button>
           {error ? <p className="text-xs text-red-300">{error}</p> : null}
         </div>
