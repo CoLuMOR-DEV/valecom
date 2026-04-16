@@ -2,6 +2,7 @@ export type Variant = {
   id: string;
   name: string;
   swatch?: string;
+  displayIcon?: string;
 };
 
 export type UpgradeLevel = {
@@ -25,12 +26,28 @@ export type SkinOffer = {
   levels: UpgradeLevel[];
 };
 
+export type BundleOffer = {
+  id: string;
+  name: string;
+  displayIcon: string;
+  priceVP: number;
+  skinIds: string[];
+  available: boolean;
+};
+
 export type ShopPayload = {
   featured: SkinOffer;
+  featuredBundle: BundleOffer;
+  bundles: BundleOffer[];
   daily: SkinOffer[];
+  catalog: SkinOffer[];
   bundlePriceVP: number;
   bundleImage: string;
   dailyResetAtISO: string;
+  requestedBundleCoverage: {
+    available: string[];
+    missing: string[];
+  };
 };
 
 export type PurchasePayload = {
