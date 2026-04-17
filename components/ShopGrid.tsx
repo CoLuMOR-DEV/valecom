@@ -142,6 +142,9 @@ export default function ShopGrid() {
             <button onClick={() => router.push(`/topup?userId=${userId}`)} className="rounded border border-emerald-400/60 bg-emerald-500/10 px-3 py-1 text-xs uppercase tracking-widest text-emerald-100">
               Top Up VP
             </button>
+            <button onClick={() => router.push(`/loadout?userId=${userId}`)} className="rounded border border-fuchsia-400/60 bg-fuchsia-500/10 px-3 py-1 text-xs uppercase tracking-widest text-fuchsia-100">
+              My Loadout
+            </button>
             <button onClick={() => refreshStore(true)} className="rounded border border-slate-400/70 bg-black/30 px-3 py-1 text-xs uppercase tracking-widest">Refresh</button>
             <p className="inline-flex items-center gap-2 rounded border border-cyan-400/50 bg-cyan-500/10 px-3 py-1 text-xs">
               <VpLogo icon={data.vpIcon} /> {userData.user?.VP_Balance ?? 0}

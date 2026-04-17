@@ -97,6 +97,52 @@ BEGIN
   RETURN GREATEST(target_cost - current_cost, 0);
 END $$
 
+
+DROP FUNCTION IF EXISTS RecommendedTopupVP $$
+CREATE FUNCTION RecommendedTopupVP(p_needed_vp INT)
+RETURNS INT
+DETERMINISTIC
+BEGIN
+  DECLARE need_vp INT DEFAULT GREATEST(IFNULL(p_needed_vp, 0), 0);
+
+  IF need_vp <= 475 THEN RETURN 475; END IF;
+  IF need_vp <= 1000 THEN RETURN 1000; END IF;
+  IF need_vp <= 2050 THEN RETURN 2050; END IF;
+  IF need_vp <= 3650 THEN RETURN 3650; END IF;
+  IF need_vp <= 5350 THEN RETURN 5350; END IF;
+  RETURN 11000;
+END $$
+
+DROP PROCEDURE IF EXISTS StartShopSession $$
+CREATE PROCEDURE StartShopSession(
+  IN p_username VARCHAR(50),
+  IN p_initial_vp INT,
+  OUT p_user_id INT,
+  OUT p_current_vp INT
+)
+BEGIN
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+    RESIGNAL;
+  END;
+
+  START TRANSACTION;
+
+  INSERT INTO Users (Username, VP_Balance)
+  VALUES (p_username, GREATEST(IFNULL(p_initial_vp, 0), 0))
+  ON DUPLICATE KEY UPDATE
+    VP_Balance = VP_Balance;
+
+  SELECT ID, VP_Balance
+    INTO p_user_id, p_current_vp
+  FROM Users
+  WHERE Username = p_username
+  LIMIT 1;
+
+  COMMIT;
+END $$
+
 DROP PROCEDURE IF EXISTS ProcessUpgradePurchase $$
 CREATE PROCEDURE ProcessUpgradePurchase(
   IN p_user_id INT,
