@@ -38,10 +38,6 @@
 - `POST /api/loadout` → persist loadout selections via `SaveLoadoutSelection`.
 - `GET /api/admin/transactions` → admin table rows.
 
-## Admin route
-- Path: `/admin`
-- Password: `VALO_ADMIN_2026`
-
 ## Production MySQL strategy for Vercel
 - PlanetScale or Aiven can be used by setting:
   `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE`.
