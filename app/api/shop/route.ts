@@ -165,7 +165,8 @@ function resolveBundleOffers(allSkins: SkinOffer[]): BundleOffer[] {
     const matching = allSkins.filter((skin) => {
       const n = normalize(skin.skinName);
       return bundle.aliases.some((alias) => n.includes(normalize(alias)));
-    });
+    })
+      .sort((a, b) => a.weaponName.localeCompare(b.weaponName));
 
     return {
       id: normalize(bundle.name).replace(/\s+/g, '-'),
@@ -188,7 +189,7 @@ function nextDailyResetISO(): string {
 
 function buildPayload(allOffers: SkinOffer[], seed: number): ShopPayload {
   const bundles = resolveBundleOffers(allOffers).filter((b) => b.available);
-  const featuredBundle = bundles[0];
+  const featuredBundle = bundles.length ? bundles[Math.abs(seed) % bundles.length] : undefined;
 
   const bundleSkinSet = new Set(bundles.flatMap((b) => b.skinIds));
   const dailyPool = allOffers.filter((offer) => !bundleSkinSet.has(offer.skinId));
@@ -209,7 +210,7 @@ function buildPayload(allOffers: SkinOffer[], seed: number): ShopPayload {
     },
     bundles,
     daily: shuffled.slice(0, 4),
-    catalog: shuffledCatalog.slice(0, 72),
+    catalog: shuffledCatalog,
     bundleImage: featuredBundle?.displayIcon || featured.showcaseImage,
     vpIcon: 'https://media.valorant-api.com/currencies/85ad13f7-3d1b-5128-9eb2-7cd8a00f8d1b/displayicon.png',
     dailyResetAtISO: nextDailyResetISO(),

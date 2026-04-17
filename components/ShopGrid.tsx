@@ -32,16 +32,48 @@ export default function ShopGrid() {
   const [now, setNow] = useState(Date.now());
   const [bundleError, setBundleError] = useState('');
   const [buyingBundle, setBuyingBundle] = useState(false);
-  const [showCatalog, setShowCatalog] = useState(false);
   const [completed, setCompleted] = useState<PurchaseDone>(null);
 
   const userId = 1;
 
-  const refreshStore = () =>
-    fetch(`/api/shop?seed=${Date.now()}`)
+  const getStoreSeed = () => {
+    if (typeof window === 'undefined') return Date.now();
+    const nextReset = new Date();
+    nextReset.setUTCHours(0, 0, 0, 0);
+    nextReset.setUTCDate(nextReset.getUTCDate() + 1);
+
+    const savedSeed = window.localStorage.getItem('valora-shop-seed');
+    const savedReset = window.localStorage.getItem('valora-shop-seed-reset');
+    if (savedSeed && savedReset && Number(savedReset) > Date.now()) {
+      return Number(savedSeed);
+    }
+
+    const newSeed = Date.now();
+    window.localStorage.setItem('valora-shop-seed', String(newSeed));
+    window.localStorage.setItem('valora-shop-seed-reset', String(nextReset.getTime()));
+    return newSeed;
+  };
+
+  const refreshStore = (forceNewSeed = false) => {
+    const seed = forceNewSeed
+      ? (() => {
+          const newSeed = Date.now();
+          if (typeof window !== 'undefined') {
+            const nextReset = new Date();
+            nextReset.setUTCHours(0, 0, 0, 0);
+            nextReset.setUTCDate(nextReset.getUTCDate() + 1);
+            window.localStorage.setItem('valora-shop-seed', String(newSeed));
+            window.localStorage.setItem('valora-shop-seed-reset', String(nextReset.getTime()));
+          }
+          return newSeed;
+        })()
+      : getStoreSeed();
+
+    return fetch(`/api/shop?seed=${seed}`)
       .then((res) => res.json())
       .then((json) => (json.featured && Array.isArray(json.daily) ? setData(json) : null))
       .catch(() => null);
+  };
 
   const refreshUser = () =>
     fetch(`/api/user/${userId}`)
@@ -98,11 +130,11 @@ export default function ShopGrid() {
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-[1350px] px-4 py-6 text-white">
-      <header className="mb-4 rounded-xl border border-slate-700/60 bg-[#0c1627] p-3">
+      <header className="mb-4 rounded-xl border border-slate-700/60 bg-gradient-to-r from-[#0c1627] to-[#121f35] p-4 shadow-lg">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Valorant Storefront</p>
-            <h1 className="text-2xl font-black uppercase">Main Shop</h1>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Valora</p>
+            <h1 className="text-2xl font-black uppercase">Skin Shop</h1>
           </div>
           <div className="flex items-center gap-2">
             <button className="rounded border border-cyan-400/60 bg-cyan-500/15 px-3 py-1 text-xs uppercase tracking-widest">Daily Offers</button>
@@ -110,7 +142,7 @@ export default function ShopGrid() {
             <button onClick={() => router.push(`/topup?userId=${userId}`)} className="rounded border border-emerald-400/60 bg-emerald-500/10 px-3 py-1 text-xs uppercase tracking-widest text-emerald-100">
               Top Up VP
             </button>
-            <button onClick={refreshStore} className="rounded border border-slate-400/70 bg-black/30 px-3 py-1 text-xs uppercase tracking-widest">Refresh</button>
+            <button onClick={() => refreshStore(true)} className="rounded border border-slate-400/70 bg-black/30 px-3 py-1 text-xs uppercase tracking-widest">Refresh</button>
             <p className="inline-flex items-center gap-2 rounded border border-cyan-400/50 bg-cyan-500/10 px-3 py-1 text-xs">
               <VpLogo icon={data.vpIcon} /> {userData.user?.VP_Balance ?? 0}
             </p>
@@ -155,9 +187,7 @@ export default function ShopGrid() {
       <section className="my-5 rounded-lg border border-slate-700/50 bg-[#0d1d35] p-3">
         <div className="mb-3 flex items-center justify-between">
           <p className="text-sm uppercase tracking-[0.2em]">Daily Offers · <span className="text-amber-300">{remaining}</span></p>
-          <button onClick={() => setShowCatalog((prev) => !prev)} className="rounded border border-slate-400/70 px-3 py-1 text-xs uppercase tracking-wider">
-            {showCatalog ? 'Hide Expanded Catalog' : 'Show Expanded Catalog'}
-          </button>
+          <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Daily rotation locked until next reset or manual refresh</p>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
           {data.daily.map((offer) => (
@@ -175,17 +205,6 @@ export default function ShopGrid() {
             </button>
           ))}
         </div>
-
-        {showCatalog ? (
-          <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-6">
-            {data.catalog.slice(0, 48).map((offer) => (
-              <button key={`catalog-${offer.skinId}`} onClick={() => setSelected(offer)} className="rounded border border-slate-700/70 bg-slate-900/40 p-2 text-left hover:border-cyan-300/60">
-                <div className="h-20">{offer.displayIcon ? <img src={offer.displayIcon} alt={offer.skinName} className="h-full w-full object-contain" /> : null}</div>
-                <p className="truncate text-[11px] uppercase">{offer.skinName}</p>
-              </button>
-            ))}
-          </div>
-        ) : null}
       </section>
 
       {selected ? (

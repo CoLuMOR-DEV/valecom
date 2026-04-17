@@ -21,6 +21,8 @@ type User = {
 type Summary = {
   transactionCount: number;
   totalVPSpent: number;
+  totalVPTopup: number;
+  totalVPPurchases: number;
   activeUsers: number;
   lastPurchaseAt: string | null;
 };
@@ -30,9 +32,21 @@ export default function AdminPage() {
   const [authed, setAuthed] = useState(false);
   const [transactions, setTransactions] = useState<Tx[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [summary, setSummary] = useState<Summary>({ transactionCount: 0, totalVPSpent: 0, activeUsers: 0, lastPurchaseAt: null });
+  const [summary, setSummary] = useState<Summary>({
+    transactionCount: 0,
+    totalVPSpent: 0,
+    totalVPTopup: 0,
+    totalVPPurchases: 0,
+    activeUsers: 0,
+    lastPurchaseAt: null
+  });
   const [error, setError] = useState('');
   const [isResetting, setIsResetting] = useState(false);
+  const [query, setQuery] = useState('');
+  const [txType, setTxType] = useState<'ALL' | 'TOPUP' | 'UPGRADE'>('ALL');
+  const [grantUserId, setGrantUserId] = useState(1);
+  const [grantAmount, setGrantAmount] = useState(1000);
+  const [isGranting, setIsGranting] = useState(false);
 
   const fetchData = useCallback(() => {
     fetch('/api/admin/transactions')
@@ -40,7 +54,16 @@ export default function AdminPage() {
       .then((json) => {
         setTransactions(json.transactions ?? []);
         setUsers(json.users ?? []);
-        setSummary(json.summary ?? { transactionCount: 0, totalVPSpent: 0, activeUsers: 0, lastPurchaseAt: null });
+        setSummary(
+          json.summary ?? {
+            transactionCount: 0,
+            totalVPSpent: 0,
+            totalVPTopup: 0,
+            totalVPPurchases: 0,
+            activeUsers: 0,
+            lastPurchaseAt: null
+          }
+        );
       })
       .catch(() => setError('Failed to load admin data'));
   }, []);
@@ -76,10 +99,42 @@ export default function AdminPage() {
     }
   };
 
+  const handleGrant = async () => {
+    setIsGranting(true);
+    setError('');
+    try {
+      const res = await fetch('/api/admin/grant-vp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: grantUserId, vpAmount: grantAmount })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Grant VP failed');
+      fetchData();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Grant VP failed');
+    } finally {
+      setIsGranting(false);
+    }
+  };
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((tx) => {
+      const passType = txType === 'ALL' ? true : tx.TransactionType === txType;
+      const q = query.trim().toLowerCase();
+      const passQuery =
+        !q ||
+        String(tx.UserID).includes(q) ||
+        tx.SkinID.toLowerCase().includes(q) ||
+        tx.TransactionType.toLowerCase().includes(q);
+      return passType && passQuery;
+    });
+  }, [transactions, txType, query]);
+
   if (!authed) {
     return (
       <main className="mx-auto mt-20 max-w-md rounded-xl border border-slate-700 bg-[#0d1829] p-8 shadow-2xl">
-        <h1 className="mb-2 text-3xl uppercase">Admin Login</h1>
+        <h1 className="mb-2 text-3xl uppercase">Valora Admin Login</h1>
         <p className="mb-6 text-sm text-slate-300">Enter your panel password to access transactions, player balances, and test reset tools.</p>
         <input
           className="mb-3 w-full rounded border border-slate-600 bg-slate-900 p-3"
@@ -88,7 +143,7 @@ export default function AdminPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <button onClick={() => setAuthed(password === 'VALO_ADMIN_2026')} className="w-full rounded bg-valorant-accent py-3">
+        <button onClick={() => setAuthed(password === 'admin123')} className="w-full rounded bg-valorant-accent py-3">
           Login
         </button>
       </main>
@@ -98,7 +153,7 @@ export default function AdminPage() {
   return (
     <main className="mx-auto max-w-7xl p-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl uppercase">Admin Control Center</h1>
+        <h1 className="text-3xl uppercase">Valora Admin Panel</h1>
         <div className="flex gap-2">
           <button onClick={fetchData} className="rounded border border-slate-500 px-4 py-2 text-sm uppercase tracking-wider">
             Refresh
@@ -111,7 +166,7 @@ export default function AdminPage() {
 
       {error ? <p className="mb-4 text-sm text-red-400">{error}</p> : null}
 
-      <section className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-4">
+      <section className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-6">
         <div className="rounded border border-slate-600 bg-slate-900/50 p-4">
           <p className="text-xs uppercase text-slate-400">Transactions</p>
           <p className="text-3xl font-bold">{summary.transactionCount ?? 0}</p>
@@ -123,6 +178,14 @@ export default function AdminPage() {
         <div className="rounded border border-slate-600 bg-slate-900/50 p-4">
           <p className="text-xs uppercase text-slate-400">Active Buyers</p>
           <p className="text-3xl font-bold">{summary.activeUsers ?? 0}</p>
+        </div>
+        <div className="rounded border border-slate-600 bg-slate-900/50 p-4">
+          <p className="text-xs uppercase text-slate-400">VP Topups</p>
+          <p className="text-3xl font-bold">{summary.totalVPTopup ?? 0}</p>
+        </div>
+        <div className="rounded border border-slate-600 bg-slate-900/50 p-4">
+          <p className="text-xs uppercase text-slate-400">VP Purchases</p>
+          <p className="text-3xl font-bold">{summary.totalVPPurchases ?? 0}</p>
         </div>
         <div className="rounded border border-slate-600 bg-slate-900/50 p-4">
           <p className="text-xs uppercase text-slate-400">Top Spender</p>
@@ -152,8 +215,47 @@ export default function AdminPage() {
         </table>
       </section>
 
+      <section className="mb-6 rounded border border-slate-600 bg-slate-900/40 p-4">
+        <h2 className="mb-3 text-lg uppercase">Admin Tools</h2>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+          <select value={grantUserId} onChange={(e) => setGrantUserId(Number(e.target.value))} className="rounded border border-slate-600 bg-slate-900 p-2">
+            {users.map((u) => (
+              <option key={u.ID} value={u.ID}>
+                {u.Username} (ID {u.ID})
+              </option>
+            ))}
+          </select>
+          <input
+            type="number"
+            min={100}
+            step={100}
+            value={grantAmount}
+            onChange={(e) => setGrantAmount(Number(e.target.value))}
+            className="rounded border border-slate-600 bg-slate-900 p-2"
+          />
+          <button onClick={handleGrant} disabled={isGranting} className="rounded bg-emerald-500 px-4 py-2 font-semibold uppercase text-black disabled:opacity-60">
+            {isGranting ? 'Granting...' : 'Grant VP'}
+          </button>
+          <p className="text-xs text-slate-300">Adds VP to user balance and records a TOPUP transaction.</p>
+        </div>
+      </section>
+
       <section className="overflow-hidden rounded border border-slate-600">
         <h2 className="border-b border-slate-700 bg-slate-900 px-4 py-3 text-lg uppercase">Transaction Log</h2>
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-700 bg-slate-900/40 px-4 py-3">
+          <input
+            placeholder="Search user, skin, type..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="w-64 rounded border border-slate-600 bg-slate-900 p-2 text-xs"
+          />
+          <select value={txType} onChange={(e) => setTxType(e.target.value as 'ALL' | 'TOPUP' | 'UPGRADE')} className="rounded border border-slate-600 bg-slate-900 p-2 text-xs">
+            <option value="ALL">All Types</option>
+            <option value="UPGRADE">Upgrade</option>
+            <option value="TOPUP">Top Up</option>
+          </select>
+          <p className="text-xs text-slate-400">{filteredTransactions.length} records shown</p>
+        </div>
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-900/50 text-slate-300">
             <tr>
@@ -165,12 +267,16 @@ export default function AdminPage() {
             </tr>
           </thead>
           <tbody>
-            {transactions.map((tx) => (
+            {filteredTransactions.map((tx) => (
               <tr key={tx.TransactionID} className="border-t border-slate-700">
                 <td className="p-3">{tx.UserID}</td>
                 <td className="p-3">{tx.SkinID} · L{tx.PurchasedLevel}</td>
                 <td className="p-3">{tx.VP_Cost}</td>
-                <td className="p-3">{tx.TransactionType}</td>
+                <td className="p-3">
+                  <span className={`rounded px-2 py-1 text-xs ${tx.TransactionType === 'TOPUP' ? 'bg-emerald-900/60 text-emerald-200' : 'bg-cyan-900/60 text-cyan-200'}`}>
+                    {tx.TransactionType}
+                  </span>
+                </td>
                 <td className="p-3">{new Date(tx.CreatedAt).toLocaleString()}</td>
               </tr>
             ))}

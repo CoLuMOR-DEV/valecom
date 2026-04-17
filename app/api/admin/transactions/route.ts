@@ -14,6 +14,8 @@ export async function GET() {
       `SELECT
           COUNT(*) AS transactionCount,
           COALESCE(SUM(VP_Cost), 0) AS totalVPSpent,
+          COALESCE(SUM(CASE WHEN TransactionType = 'TOPUP' THEN VP_Cost ELSE 0 END), 0) AS totalVPTopup,
+          COALESCE(SUM(CASE WHEN TransactionType = 'UPGRADE' THEN VP_Cost ELSE 0 END), 0) AS totalVPPurchases,
           COUNT(DISTINCT UserID) AS activeUsers,
           MAX(CreatedAt) AS lastPurchaseAt
        FROM Transactions`
