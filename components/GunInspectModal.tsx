@@ -10,12 +10,14 @@ type Props = {
   userId: number;
   userVP: number;
   ownedLevel: number;
+  canPurchase: boolean;
   onClose: () => void;
+  onRequireLogin: () => void;
 };
 
 const steps = ['Authorizing purchase', 'Reserving inventory', 'Finalizing'];
 
-export default function GunInspectModal({ offer, userId, userVP, ownedLevel, onClose }: Props) {
+export default function GunInspectModal({ offer, userId, userVP, ownedLevel, canPurchase, onClose, onRequireLogin }: Props) {
   const router = useRouter();
   const [selectedLevel, setSelectedLevel] = useState(Math.max(1, ownedLevel || 1));
   const [variantId, setVariantId] = useState(offer.variants[0]?.id);
@@ -29,6 +31,12 @@ export default function GunInspectModal({ offer, userId, userVP, ownedLevel, onC
 
   const handleBuySkin = async () => {
     setError('');
+
+    if (!canPurchase) {
+      onRequireLogin();
+      return;
+    }
+
     if (ownedLevel >= 1) {
       setError('Skin already owned. Check your Loadout to equip it.');
       return;
@@ -133,14 +141,16 @@ export default function GunInspectModal({ offer, userId, userVP, ownedLevel, onC
               disabled={busy}
               className="rounded border-2 border-slate-100 bg-[#ece9df] py-3 text-black transition hover:brightness-110 disabled:opacity-60"
             >
-              {busy ? 'PROCESSING...' : `BUY SKIN · ${offer.priceVP} VP`}
+              {busy ? 'PROCESSING...' : canPurchase ? `BUY SKIN · ${offer.priceVP} VP` : 'LOGIN TO BUY'}
             </button>
             <button
-              onClick={() => router.push(`/topup?userId=${userId}&skinName=${encodeURIComponent(offer.skinName)}&vpDeficit=${Math.max(0, offer.priceVP - userVP)}`)}
+              onClick={() => (canPurchase ? router.push(`/topup?userId=${userId}&skinName=${encodeURIComponent(offer.skinName)}&vpDeficit=${Math.max(0, offer.priceVP - userVP)}`) : onRequireLogin())}
               className="rounded border border-cyan-300/60 bg-cyan-500/10 py-2 text-xs font-semibold uppercase tracking-wider text-cyan-100"
             >
-              Top Up VP
+              {canPurchase ? 'Top Up VP' : 'Login Required'}
             </button>
+
+            {!canPurchase ? <p className="text-xs text-amber-300">Guest mode: inspect all levels and variants, but purchases are disabled.</p> : null}
 
             {busy ? (
               <div className="rounded border border-slate-600/60 bg-black/35 p-3 text-xs">

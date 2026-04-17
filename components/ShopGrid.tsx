@@ -12,7 +12,7 @@ type SessionUser = { ID: number; Username: string; VP_Balance: number };
 type UserResponse = { user?: SessionUser; ownedSkins?: Owned[] };
 type PurchaseDone = { title: string; subtitle: string; image?: string } | null;
 
-const fallbackUser = { user: { ID: 1, VP_Balance: 0, Username: 'Loading Agent' }, ownedSkins: [] as Owned[] };
+const fallbackUser = { user: { ID: 0, VP_Balance: 0, Username: 'Guest' }, ownedSkins: [] as Owned[] };
 
 function VpLogo({ icon }: { icon?: string }) {
   return icon ? <img src={icon} alt="Valorant Points" className="h-5 w-5 rounded-full border border-slate-500/70" /> : <span className="text-xs">VP</span>;
@@ -39,20 +39,17 @@ export default function ShopGrid() {
 
   useEffect(() => {
     const raw = window.localStorage.getItem('valora-user');
-    if (!raw) {
-      router.replace('/login');
-      return;
-    }
+    if (!raw) return;
 
     try {
       setSessionUser(JSON.parse(raw));
     } catch {
       window.localStorage.removeItem('valora-user');
-      router.replace('/login');
     }
-  }, [router]);
+  }, []);
 
   const userId = sessionUser?.ID ?? 0;
+  const canPurchase = Boolean(sessionUser?.ID);
 
   const getStoreSeed = () => {
     if (typeof window === 'undefined') return Date.now();
@@ -94,7 +91,11 @@ export default function ShopGrid() {
   };
 
   const refreshUser = () => {
-    if (!userId) return;
+    if (!userId) {
+      setUserData(fallbackUser);
+      return;
+    }
+
     fetch(`/api/user/${userId}`)
       .then((res) => res.json())
       .then((json) => {
@@ -109,8 +110,10 @@ export default function ShopGrid() {
   };
 
   useEffect(() => {
-    if (!userId) return;
     refreshStore();
+  }, []);
+
+  useEffect(() => {
     refreshUser();
   }, [userId]);
 
@@ -124,7 +127,7 @@ export default function ShopGrid() {
   const bundleSkins = useMemo(() => data?.catalog.filter((skin) => activeBundle?.skinIds.includes(skin.skinId)) ?? [], [activeBundle?.skinIds, data?.catalog]);
 
   const handleBuyBundle = async () => {
-    if (!activeBundle) return;
+    if (!activeBundle || !canPurchase) return;
     setBundleError('');
 
     if ((userData.user?.VP_Balance ?? 0) < activeBundle.priceVP) {
@@ -143,38 +146,41 @@ export default function ShopGrid() {
     setCompleted({ title: activeBundle.name, subtitle: 'Bundle Purchased', image: data?.bundleImage });
   };
 
-  if (!sessionUser) return <div className="p-8 text-slate-200">Checking session...</div>;
   if (!data || !activeBundle) return <div className="p-8 text-xl uppercase tracking-widest text-slate-300">Loading store...</div>;
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-[1350px] px-4 py-6 text-white">
-      <header className="mb-4 rounded-xl border border-slate-700/60 bg-gradient-to-r from-[#0c1627] to-[#121f35] p-4 shadow-lg">
+    <main className="mx-auto min-h-screen w-full max-w-[1350px] px-3 py-4 text-white md:px-4 md:py-6">
+      <header className="mb-4 rounded-xl border border-slate-700/60 bg-gradient-to-r from-[#0c1627] to-[#121f35] p-3 shadow-lg md:p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Valora</p>
             <h1 className="text-2xl font-black uppercase">Skin Shop</h1>
-            <p className="text-xs text-slate-400">Signed in as {userData.user?.Username ?? sessionUser.Username}</p>
+            <p className="text-xs text-slate-400">{canPurchase ? `Signed in as ${userData.user?.Username ?? sessionUser?.Username}` : 'Guest mode: inspect only'}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button className="rounded border border-cyan-400/60 bg-cyan-500/15 px-3 py-1 text-xs uppercase tracking-widest">Daily Offers</button>
-            <button onClick={() => router.push(`/topup?userId=${userId}`)} className="rounded border border-emerald-400/60 bg-emerald-500/10 px-3 py-1 text-xs uppercase tracking-widest text-emerald-100">
+            <button onClick={() => (canPurchase ? router.push(`/topup?userId=${userId}`) : router.push('/login'))} className="rounded border border-emerald-400/60 bg-emerald-500/10 px-3 py-1 text-xs uppercase tracking-widest text-emerald-100">
               Top Up VP
             </button>
-            <button onClick={() => router.push(`/loadout?userId=${userId}`)} className="rounded border border-fuchsia-400/60 bg-fuchsia-500/10 px-3 py-1 text-xs uppercase tracking-widest text-fuchsia-100">
+            <button onClick={() => (canPurchase ? router.push(`/loadout?userId=${userId}`) : router.push('/login'))} className="rounded border border-fuchsia-400/60 bg-fuchsia-500/10 px-3 py-1 text-xs uppercase tracking-widest text-fuchsia-100">
               My Loadout
             </button>
             <button onClick={() => router.push('/admin')} className="rounded border border-amber-300/60 bg-amber-500/10 px-3 py-1 text-xs uppercase tracking-widest text-amber-100">
               Admin
             </button>
-            <button
-              onClick={() => {
-                window.localStorage.removeItem('valora-user');
-                router.push('/login');
-              }}
-              className="rounded border border-slate-400/70 bg-black/30 px-3 py-1 text-xs uppercase tracking-widest"
-            >
-              Logout
-            </button>
+            {canPurchase ? (
+              <button
+                onClick={() => {
+                  window.localStorage.removeItem('valora-user');
+                  setSessionUser(null);
+                }}
+                className="rounded border border-slate-400/70 bg-black/30 px-3 py-1 text-xs uppercase tracking-widest"
+              >
+                Logout
+              </button>
+            ) : (
+              <button onClick={() => router.push('/login')} className="rounded border border-slate-400/70 bg-black/30 px-3 py-1 text-xs uppercase tracking-widest">Login / Sign Up</button>
+            )}
             <button onClick={() => refreshStore(true)} className="rounded border border-slate-400/70 bg-black/30 px-3 py-1 text-xs uppercase tracking-widest">Refresh</button>
             <p className="inline-flex items-center gap-2 rounded border border-cyan-400/50 bg-cyan-500/10 px-3 py-1 text-xs">
               <VpLogo icon={data.vpIcon} /> {userData.user?.VP_Balance ?? 0}
@@ -187,17 +193,17 @@ export default function ShopGrid() {
         onClick={() => setShowBundleInspect(true)}
         className="relative cursor-pointer overflow-hidden rounded-xl border border-slate-300/30 bg-[#0b1728] shadow-[0_20px_80px_rgba(0,0,0,.45)]"
       >
-        <img src={data.bundleImage} alt={activeBundle.name} className="h-[430px] w-full object-cover opacity-75" />
+        <img src={data.bundleImage} alt={activeBundle.name} className="h-[260px] w-full object-cover opacity-75 md:h-[430px]" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/35 to-black/75" />
-        <div className="absolute inset-0 grid grid-cols-12 gap-4 p-5">
-          <div className="col-span-8 flex flex-col justify-between">
+        <div className="absolute inset-0 grid grid-cols-1 gap-4 p-4 md:grid-cols-12 md:p-5">
+          <div className="flex flex-col justify-between md:col-span-8">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-slate-300">Featured Collection</p>
-              <h2 className="mt-2 text-5xl font-black uppercase">{activeBundle.name}</h2>
-              <p className="mt-3 text-xs uppercase tracking-[0.2em] text-cyan-200">Click anywhere to inspect the full bundle</p>
+              <h2 className="mt-2 text-3xl font-black uppercase md:text-5xl">{activeBundle.name}</h2>
+              <p className="mt-3 text-xs uppercase tracking-[0.2em] text-cyan-200">Click anywhere to inspect the full bundle with levels</p>
             </div>
-            <div className="flex items-center gap-2">
-              <button onClick={(e) => { e.stopPropagation(); setShowBundleInspect(true); }} className="rounded border-2 border-slate-100 bg-[#ece9df] px-8 py-3 text-lg font-bold text-black">
+            <div className="mt-3 flex items-center gap-2">
+              <button onClick={(e) => { e.stopPropagation(); setShowBundleInspect(true); }} className="rounded border-2 border-slate-100 bg-[#ece9df] px-6 py-2 text-lg font-bold text-black md:px-8 md:py-3">
                 <span className="inline-flex items-center gap-2"><VpLogo icon={data.vpIcon} />{activeBundle.priceVP.toLocaleString()}</span>
               </button>
             </div>
@@ -207,11 +213,11 @@ export default function ShopGrid() {
       </section>
 
       <section className="my-5 rounded-lg border border-slate-700/50 bg-[#0d1d35] p-3">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm uppercase tracking-[0.2em]">Daily Offers · <span className="text-amber-300">{remaining}</span></p>
           <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Daily rotation locked until next reset or manual refresh</p>
         </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
           {data.daily.map((offer) => (
             <button key={offer.skinId} onClick={() => setSelected(offer)} className="group overflow-hidden rounded border border-slate-400/40 bg-[#0e2038] text-left transition hover:-translate-y-0.5 hover:border-cyan-300/60">
               <div className="h-40 bg-gradient-to-br from-[#573455] to-[#142c4e] p-2">
@@ -232,9 +238,11 @@ export default function ShopGrid() {
       {selected ? (
         <GunInspectModal
           offer={selected}
-          userId={userData.user?.ID ?? userId}
+          userId={userData.user?.ID ?? 0}
           userVP={userData.user?.VP_Balance ?? 0}
           ownedLevel={userData.ownedSkins?.find((s) => s.SkinID === selected.skinId)?.LevelUnlocked ?? 0}
+          canPurchase={canPurchase}
+          onRequireLogin={() => router.push('/login')}
           onClose={() => {
             setSelected(null);
             refreshUser();
@@ -247,7 +255,9 @@ export default function ShopGrid() {
           bundle={activeBundle}
           skins={bundleSkins}
           userVP={userData.user?.VP_Balance ?? 0}
+          canPurchase={canPurchase}
           onClose={() => setShowBundleInspect(false)}
+          onRequireLogin={() => router.push('/login')}
           onBuyBundle={async () => {
             try {
               await handleBuyBundle();

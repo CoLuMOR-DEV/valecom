@@ -32,6 +32,27 @@ CREATE TABLE IF NOT EXISTS Transactions (
   CONSTRAINT fk_tx_user FOREIGN KEY (UserID) REFERENCES Users(ID)
 );
 
+
+CREATE TABLE IF NOT EXISTS LoadoutSelections (
+  SelectionID INT PRIMARY KEY AUTO_INCREMENT,
+  UserID INT NOT NULL,
+  WeaponSlot VARCHAR(50) NOT NULL,
+  SkinID VARCHAR(100) NOT NULL,
+  UpdatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_user_slot (UserID, WeaponSlot),
+  CONSTRAINT fk_loadout_user FOREIGN KEY (UserID) REFERENCES Users(ID)
+);
+
+CREATE TABLE IF NOT EXISTS AuditLogs (
+  AuditID INT PRIMARY KEY AUTO_INCREMENT,
+  UserID INT NULL,
+  ActionType VARCHAR(50) NOT NULL,
+  ActionMeta JSON NULL,
+  CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_audit_user (UserID),
+  CONSTRAINT fk_audit_user FOREIGN KEY (UserID) REFERENCES Users(ID)
+);
+
 CREATE TABLE IF NOT EXISTS UpgradePricing (
   SkinID VARCHAR(100) NOT NULL,
   Level INT NOT NULL,
@@ -159,5 +180,46 @@ BEGIN
 
   COMMIT;
 END $$
+
+
+DROP PROCEDURE IF EXISTS SaveLoadoutSelection $$
+CREATE PROCEDURE SaveLoadoutSelection(
+  IN p_user_id INT,
+  IN p_weapon_slot VARCHAR(50),
+  IN p_skin_id VARCHAR(100)
+)
+BEGIN
+  INSERT INTO LoadoutSelections (UserID, WeaponSlot, SkinID)
+  VALUES (p_user_id, p_weapon_slot, p_skin_id)
+  ON DUPLICATE KEY UPDATE SkinID = VALUES(SkinID);
+END $$
+
+DROP TRIGGER IF EXISTS trg_transactions_audit $$
+CREATE TRIGGER trg_transactions_audit
+AFTER INSERT ON Transactions
+FOR EACH ROW
+BEGIN
+  INSERT INTO AuditLogs (UserID, ActionType, ActionMeta)
+  VALUES (
+    NEW.UserID,
+    CONCAT('TRANSACTION_', NEW.TransactionType),
+    JSON_OBJECT('skinId', NEW.SkinID, 'vpCost', NEW.VP_Cost, 'level', NEW.PurchasedLevel)
+  );
+END $$
+
+DROP VIEW IF EXISTS v_user_commerce_summary $$
+CREATE VIEW v_user_commerce_summary AS
+SELECT
+  u.ID AS UserID,
+  u.Username,
+  u.Email,
+  u.VP_Balance,
+  COALESCE(SUM(CASE WHEN t.TransactionType = 'TOPUP' THEN t.VP_Cost ELSE 0 END), 0) AS TotalTopupVP,
+  COALESCE(SUM(CASE WHEN t.TransactionType IN ('PURCHASE', 'BUNDLE') THEN t.VP_Cost ELSE 0 END), 0) AS TotalSpentVP,
+  COUNT(CASE WHEN t.TransactionType = 'PURCHASE' THEN 1 END) AS SkinPurchaseCount,
+  COUNT(CASE WHEN t.TransactionType = 'BUNDLE' THEN 1 END) AS BundlePurchaseCount
+FROM Users u
+LEFT JOIN Transactions t ON t.UserID = u.ID
+GROUP BY u.ID, u.Username, u.Email, u.VP_Balance $$
 
 DELIMITER ;

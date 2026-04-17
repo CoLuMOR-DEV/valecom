@@ -60,14 +60,14 @@ const REQUESTED_BUNDLES: BundleSpec[] = [
   { name: 'Spectrum', aliases: ['Spectrum'], priceVP: 10700 },
   { name: 'Elderflame', aliases: ['Elderflame'], priceVP: 9900 },
   { name: 'RGX 11z Pro', aliases: ['RGX 11z Pro', 'RGX'], priceVP: 8700 },
-  { name: 'RGX 11z Pro EP 4', aliases: ['RGX 11z Pro 11z Pro EP 4', 'RGX 11z Pro Ep 4'], priceVP: 8700 },
+  { name: 'RGX 11z Pro EP 4', aliases: ['RGX 11z Pro EP 4', 'RGX 11z Pro Ep 4'], priceVP: 8700 },
   { name: 'Reaver', aliases: ['Reaver'], priceVP: 7100 },
   { name: 'Reaver // 2.0', aliases: ['Reaver 2.0', 'Reaver // 2.0'], priceVP: 7100 },
   { name: 'Prime', aliases: ['Prime'], priceVP: 7100 },
   { name: 'Prime // 2.0', aliases: ['Prime 2.0', 'Prime // 2.0'], priceVP: 7100 },
   { name: 'Oni', aliases: ['Oni'], priceVP: 7100 },
   { name: 'Oni // 2.0', aliases: ['Oni 2.0', 'Oni // 2.0'], priceVP: 7100 },
-  { name: 'Ion', aliases: ['Ion'], priceVP: 7100 },
+  { name: 'Ion', aliases: ['Ion', 'Ion 2.0', 'Ion // 2.0'], priceVP: 7100 },
   { name: 'Magepunk', aliases: ['Magepunk'], priceVP: 7100 }
 ];
 
@@ -160,12 +160,15 @@ function isStandardWeaponSkin(skin: ApiSkin): boolean {
   return true;
 }
 
+function matchesBundleAlias(skinName: string, alias: string): boolean {
+  const n = normalize(skinName);
+  const a = normalize(alias);
+  return n === a || n.startsWith(`${a} `) || n.startsWith(`${a} //`);
+}
+
 function resolveBundleOffers(allSkins: SkinOffer[]): BundleOffer[] {
   return REQUESTED_BUNDLES.map((bundle) => {
-    const matching = allSkins.filter((skin) => {
-      const n = normalize(skin.skinName);
-      return bundle.aliases.some((alias) => n.includes(normalize(alias)));
-    })
+    const matching = allSkins.filter((skin) => bundle.aliases.some((alias) => matchesBundleAlias(skin.skinName, alias)))
       .sort((a, b) => a.weaponName.localeCompare(b.weaponName));
 
     return {
