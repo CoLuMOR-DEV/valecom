@@ -9,16 +9,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'userId and positive vpAmount required' }, { status: 400 });
     }
 
-    await pool.query('UPDATE Users SET VP_Balance = VP_Balance + ? WHERE ID = ?', [
-      Number(vpAmount),
-      Number(userId)
-    ]);
-
-    await pool.query(
-      `INSERT INTO Transactions (UserID, SkinID, PurchasedLevel, VP_Cost, TransactionType)
-       VALUES (?, 'VP_TOPUP', 0, ?, 'TOPUP')`,
-      [Number(userId), Number(vpAmount)]
-    );
+    await pool.query('CALL ProcessTopup(?, ?)', [Number(userId), Number(vpAmount)]);
 
     const [vpRows] = await pool.query('SELECT CheckTotalVP(?) AS vp', [Number(userId)]);
     const vpBalance = Number((vpRows as Array<{ vp: number }>)[0]?.vp ?? 0);

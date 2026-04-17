@@ -6,6 +6,7 @@ import type { SkinOffer, ShopPayload } from '@/types/shop';
 
 type Owned = { SkinID: string; LevelUnlocked: number };
 type UserResponse = { user?: { ID: number; VP_Balance: number; Username: string }; ownedSkins?: Owned[] };
+type LoadoutApiResponse = { selections?: Array<{ WeaponSlot: string; SkinID: string }> };
 
 type Slot = { key: string; label: string; group: string };
 
@@ -38,27 +39,41 @@ export default function LoadoutClient() {
   const [shopData, setShopData] = useState<ShopPayload | null>(null);
   const [userData, setUserData] = useState<UserResponse | null>(null);
   const [equipped, setEquipped] = useState<Record<string, string>>({});
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveMessage, setSaveMessage] = useState('');
 
   useEffect(() => {
-    Promise.all([fetch('/api/shop').then((res) => res.json()), fetch(`/api/user/${userId}`).then((res) => res.json())])
-      .then(([shop, user]) => {
+    Promise.all([
+      fetch('/api/shop').then((res) => res.json()),
+      fetch(`/api/user/${userId}`).then((res) => res.json()),
+      fetch(`/api/loadout?userId=${userId}`).then((res) => res.json())
+    ])
+      .then(([shop, user, loadout]) => {
         setShopData(shop?.catalog ? shop : null);
         setUserData(user?.user ? user : null);
+
+        const selections = (loadout as LoadoutApiResponse)?.selections ?? [];
+        if (selections.length > 0) {
+          const fromDb = selections.reduce<Record<string, string>>((acc, row) => {
+            acc[row.WeaponSlot] = row.SkinID;
+            return acc;
+          }, {});
+          setEquipped(fromDb);
+          return;
+        }
+
+        const key = `valora-loadout-${userId}`;
+        try {
+          const saved = window.localStorage.getItem(key);
+          if (saved) setEquipped(JSON.parse(saved));
+        } catch {
+          setEquipped({});
+        }
       })
       .catch(() => {
         setShopData(null);
         setUserData(null);
       });
-  }, [userId]);
-
-  useEffect(() => {
-    const key = `valora-loadout-${userId}`;
-    try {
-      const saved = window.localStorage.getItem(key);
-      if (saved) setEquipped(JSON.parse(saved));
-    } catch {
-      setEquipped({});
-    }
   }, [userId]);
 
   useEffect(() => {
@@ -98,11 +113,56 @@ export default function LoadoutClient() {
     }, 0);
   }, [equipped, ownedMap]);
 
+  async function onSaveLoadout() {
+    const selections = Object.entries(equipped)
+      .filter(([, skinId]) => Boolean(skinId))
+      .map(([weaponSlot, skinId]) => ({ weaponSlot, skinId }));
+
+    if (selections.length === 0) {
+      setSaveState('error');
+      setSaveMessage('Choose at least one skin before saving.');
+      return;
+    }
+
+    setSaveState('saving');
+    setSaveMessage('Saving your loadout...');
+
+    try {
+      const res = await fetch('/api/loadout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, selections })
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? 'Failed to save loadout');
+      }
+      setSaveState('saved');
+      setSaveMessage(`Saved ${json.savedCount ?? selections.length} loadout slot(s).`);
+    } catch (error) {
+      setSaveState('error');
+      setSaveMessage(error instanceof Error ? error.message : 'Failed to save loadout');
+    }
+  }
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-[1300px] p-4 text-white md:p-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <button onClick={() => router.push('/')} className="rounded border border-slate-500/70 bg-slate-900/60 px-4 py-2 text-xs uppercase tracking-[0.2em]">← Back to Shop</button>
         <p className="text-3xl font-black uppercase">Total Loadout Cost: {selectedCost.toLocaleString()} VP</p>
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-600/60 bg-slate-900/40 p-3">
+        <button
+          onClick={onSaveLoadout}
+          disabled={saveState === 'saving'}
+          className="rounded border border-fuchsia-400/70 bg-fuchsia-500/15 px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {saveState === 'saving' ? 'Saving…' : 'Save Loadout'}
+        </button>
+        {saveMessage ? (
+          <p className={`text-xs ${saveState === 'error' ? 'text-rose-300' : 'text-emerald-300'}`}>{saveMessage}</p>
+        ) : null}
       </div>
 
       {!userData ? <p className="text-slate-300">Loading your loadout...</p> : null}

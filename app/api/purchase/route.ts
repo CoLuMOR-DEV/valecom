@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required body fields.' }, { status: 400 });
     }
 
-    const [resultSets] = await pool.query('CALL ProcessUpgradePurchase(?, ?, ?, ?)', [
+    await pool.query('CALL ProcessSkinPurchase(?, ?, ?, ?)', [
       Number(userId),
       String(skinId),
       Number(level),
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     const [vpRows] = await pool.query('SELECT CheckTotalVP(?) AS vp', [Number(userId)]);
     const vpBalance = Number((vpRows as Array<{ vp: number }>)[0]?.vp ?? 0);
 
-    return NextResponse.json({ ok: true, resultSets, vpBalance });
+    return NextResponse.json({ ok: true, vpBalance });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown purchase error';
     return NextResponse.json({ error: message }, { status: 500 });
