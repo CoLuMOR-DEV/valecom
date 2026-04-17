@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     await connection.query(
       `INSERT INTO Transactions (UserID, SkinID, PurchasedLevel, VP_Cost, TransactionType)
-       VALUES (?, ?, 1, ?, 'UPGRADE')`,
+       VALUES (?, ?, 1, ?, 'BUNDLE')`,
       [Number(userId), `BUNDLE:${String(bundleId)}`, Number(priceVP)]
     );
 

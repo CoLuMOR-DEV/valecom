@@ -5,6 +5,8 @@ USE valorant_shop;
 CREATE TABLE IF NOT EXISTS Users (
   ID INT PRIMARY KEY AUTO_INCREMENT,
   Username VARCHAR(50) NOT NULL UNIQUE,
+  Email VARCHAR(120) NULL UNIQUE,
+  PasswordHash VARCHAR(255) NOT NULL DEFAULT 'demo123',
   VP_Balance INT NOT NULL DEFAULT 0,
   CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -25,7 +27,7 @@ CREATE TABLE IF NOT EXISTS Transactions (
   SkinID VARCHAR(100) NOT NULL,
   PurchasedLevel INT NOT NULL,
   VP_Cost INT NOT NULL,
-  TransactionType ENUM('UPGRADE', 'TOPUP') NOT NULL DEFAULT 'UPGRADE',
+  TransactionType ENUM('PURCHASE', 'BUNDLE', 'TOPUP') NOT NULL DEFAULT 'PURCHASE',
   CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_tx_user FOREIGN KEY (UserID) REFERENCES Users(ID)
 );
@@ -37,9 +39,9 @@ CREATE TABLE IF NOT EXISTS UpgradePricing (
   PRIMARY KEY (SkinID, Level)
 );
 
-INSERT IGNORE INTO Users (ID, Username, VP_Balance) VALUES
-(1, 'demo_user', 350),
-(2, 'admin_user', 5000);
+INSERT IGNORE INTO Users (ID, Username, Email, PasswordHash, VP_Balance) VALUES
+(1, 'demo_user', 'demo@valora.local', 'demo123', 350),
+(2, 'admin_user', 'admin@valora.local', 'admin123', 5000);
 
 -- Per-level cumulative pricing examples
 INSERT IGNORE INTO UpgradePricing (SkinID, Level, VP_Cost) VALUES
@@ -65,39 +67,6 @@ BEGIN
   RETURN IFNULL(total_vp, 0);
 END $$
 
-DROP FUNCTION IF EXISTS CalculateUpgradeCost $$
-CREATE FUNCTION CalculateUpgradeCost(p_user_id INT, p_skin_id VARCHAR(100), p_target_level INT)
-RETURNS INT
-READS SQL DATA
-DETERMINISTIC
-BEGIN
-  DECLARE current_level INT DEFAULT 1;
-  DECLARE current_cost INT DEFAULT 0;
-  DECLARE target_cost INT DEFAULT 0;
-
-  SELECT IFNULL(LevelUnlocked, 1)
-    INTO current_level
-  FROM OwnedSkins
-  WHERE UserID = p_user_id AND SkinID = p_skin_id;
-
-  SELECT IFNULL(VP_Cost, 0)
-    INTO current_cost
-  FROM UpgradePricing
-  WHERE SkinID = p_skin_id AND Level = current_level;
-
-  SELECT IFNULL(VP_Cost, 0)
-    INTO target_cost
-  FROM UpgradePricing
-  WHERE SkinID = p_skin_id AND Level = p_target_level;
-
-  IF p_target_level <= current_level THEN
-    RETURN 0;
-  END IF;
-
-  RETURN GREATEST(target_cost - current_cost, 0);
-END $$
-
-
 DROP FUNCTION IF EXISTS RecommendedTopupVP $$
 CREATE FUNCTION RecommendedTopupVP(p_needed_vp INT)
 RETURNS INT
@@ -116,6 +85,8 @@ END $$
 DROP PROCEDURE IF EXISTS StartShopSession $$
 CREATE PROCEDURE StartShopSession(
   IN p_username VARCHAR(50),
+  IN p_email VARCHAR(120),
+  IN p_password_hash VARCHAR(255),
   IN p_initial_vp INT,
   OUT p_user_id INT,
   OUT p_current_vp INT
@@ -129,10 +100,11 @@ BEGIN
 
   START TRANSACTION;
 
-  INSERT INTO Users (Username, VP_Balance)
-  VALUES (p_username, GREATEST(IFNULL(p_initial_vp, 0), 0))
+  INSERT INTO Users (Username, Email, PasswordHash, VP_Balance)
+  VALUES (p_username, p_email, p_password_hash, GREATEST(IFNULL(p_initial_vp, 0), 0))
   ON DUPLICATE KEY UPDATE
-    VP_Balance = VP_Balance;
+    Email = COALESCE(VALUES(Email), Email),
+    PasswordHash = PasswordHash;
 
   SELECT ID, VP_Balance
     INTO p_user_id, p_current_vp
@@ -183,7 +155,7 @@ BEGIN
   ON DUPLICATE KEY UPDATE LevelUnlocked = GREATEST(LevelUnlocked, VALUES(LevelUnlocked));
 
   INSERT INTO Transactions (UserID, SkinID, PurchasedLevel, VP_Cost, TransactionType)
-  VALUES (p_user_id, p_skin_id, p_level, p_vp_cost, 'UPGRADE');
+  VALUES (p_user_id, p_skin_id, p_level, p_vp_cost, 'PURCHASE');
 
   COMMIT;
 END $$

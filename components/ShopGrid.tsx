@@ -4,10 +4,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import GunInspectModal from './GunInspectModal';
 import PurchaseCompleteModal from './PurchaseCompleteModal';
+import BundleInspectModal from './BundleInspectModal';
 import type { ShopPayload, SkinOffer } from '@/types/shop';
 
 type Owned = { SkinID: string; LevelUnlocked: number };
-type UserResponse = { user?: { ID: number; VP_Balance: number; Username: string }; ownedSkins?: Owned[] };
+type SessionUser = { ID: number; Username: string; VP_Balance: number };
+type UserResponse = { user?: SessionUser; ownedSkins?: Owned[] };
 type PurchaseDone = { title: string; subtitle: string; image?: string } | null;
 
 const fallbackUser = { user: { ID: 1, VP_Balance: 0, Username: 'Loading Agent' }, ownedSkins: [] as Owned[] };
@@ -29,12 +31,28 @@ export default function ShopGrid() {
   const [data, setData] = useState<ShopPayload | null>(null);
   const [selected, setSelected] = useState<SkinOffer | null>(null);
   const [userData, setUserData] = useState<UserResponse>(fallbackUser);
+  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  const [showBundleInspect, setShowBundleInspect] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [bundleError, setBundleError] = useState('');
-  const [buyingBundle, setBuyingBundle] = useState(false);
   const [completed, setCompleted] = useState<PurchaseDone>(null);
 
-  const userId = 1;
+  useEffect(() => {
+    const raw = window.localStorage.getItem('valora-user');
+    if (!raw) {
+      router.replace('/login');
+      return;
+    }
+
+    try {
+      setSessionUser(JSON.parse(raw));
+    } catch {
+      window.localStorage.removeItem('valora-user');
+      router.replace('/login');
+    }
+  }, [router]);
+
+  const userId = sessionUser?.ID ?? 0;
 
   const getStoreSeed = () => {
     if (typeof window === 'undefined') return Date.now();
@@ -75,16 +93,26 @@ export default function ShopGrid() {
       .catch(() => null);
   };
 
-  const refreshUser = () =>
+  const refreshUser = () => {
+    if (!userId) return;
     fetch(`/api/user/${userId}`)
       .then((res) => res.json())
-      .then((json) => setUserData(json?.user ? { user: json.user, ownedSkins: json.ownedSkins ?? [] } : fallbackUser))
+      .then((json) => {
+        const payload = json?.user ? { user: json.user, ownedSkins: json.ownedSkins ?? [] } : fallbackUser;
+        setUserData(payload);
+        if (payload.user && typeof window !== 'undefined') {
+          window.localStorage.setItem('valora-user', JSON.stringify(payload.user));
+          setSessionUser(payload.user);
+        }
+      })
       .catch(() => setUserData(fallbackUser));
+  };
 
   useEffect(() => {
+    if (!userId) return;
     refreshStore();
     refreshUser();
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -100,32 +128,22 @@ export default function ShopGrid() {
     setBundleError('');
 
     if ((userData.user?.VP_Balance ?? 0) < activeBundle.priceVP) {
-      setBundleError('Not enough VP to buy this bundle.');
-      return;
-    }
-    if (!activeBundle.skinIds.length) {
-      setBundleError('Bundle skins were not resolved from the API.');
-      return;
+      throw new Error('Not enough VP to buy this bundle.');
     }
 
-    setBuyingBundle(true);
-    try {
-      const res = await fetch('/api/purchase-bundle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, bundleId: activeBundle.id, priceVP: activeBundle.priceVP, skinIds: activeBundle.skinIds })
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? 'Bundle purchase failed');
-      await refreshUser();
-      setCompleted({ title: activeBundle.name, subtitle: 'Bundle Purchased', image: data?.bundleImage });
-    } catch (e) {
-      setBundleError(e instanceof Error ? e.message : 'Bundle purchase failed');
-    } finally {
-      setBuyingBundle(false);
-    }
+    const res = await fetch('/api/purchase-bundle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, bundleId: activeBundle.id, priceVP: activeBundle.priceVP, skinIds: activeBundle.skinIds })
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ?? 'Bundle purchase failed');
+
+    await refreshUser();
+    setCompleted({ title: activeBundle.name, subtitle: 'Bundle Purchased', image: data?.bundleImage });
   };
 
+  if (!sessionUser) return <div className="p-8 text-slate-200">Checking session...</div>;
   if (!data || !activeBundle) return <div className="p-8 text-xl uppercase tracking-widest text-slate-300">Loading store...</div>;
 
   return (
@@ -135,15 +153,27 @@ export default function ShopGrid() {
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Valora</p>
             <h1 className="text-2xl font-black uppercase">Skin Shop</h1>
+            <p className="text-xs text-slate-400">Signed in as {userData.user?.Username ?? sessionUser.Username}</p>
           </div>
           <div className="flex items-center gap-2">
             <button className="rounded border border-cyan-400/60 bg-cyan-500/15 px-3 py-1 text-xs uppercase tracking-widest">Daily Offers</button>
-            <button disabled className="cursor-not-allowed rounded border border-slate-600/60 bg-slate-900/50 px-3 py-1 text-xs uppercase tracking-widest text-slate-500">Bundle Shop</button>
             <button onClick={() => router.push(`/topup?userId=${userId}`)} className="rounded border border-emerald-400/60 bg-emerald-500/10 px-3 py-1 text-xs uppercase tracking-widest text-emerald-100">
               Top Up VP
             </button>
             <button onClick={() => router.push(`/loadout?userId=${userId}`)} className="rounded border border-fuchsia-400/60 bg-fuchsia-500/10 px-3 py-1 text-xs uppercase tracking-widest text-fuchsia-100">
               My Loadout
+            </button>
+            <button onClick={() => router.push('/admin')} className="rounded border border-amber-300/60 bg-amber-500/10 px-3 py-1 text-xs uppercase tracking-widest text-amber-100">
+              Admin
+            </button>
+            <button
+              onClick={() => {
+                window.localStorage.removeItem('valora-user');
+                router.push('/login');
+              }}
+              className="rounded border border-slate-400/70 bg-black/30 px-3 py-1 text-xs uppercase tracking-widest"
+            >
+              Logout
             </button>
             <button onClick={() => refreshStore(true)} className="rounded border border-slate-400/70 bg-black/30 px-3 py-1 text-xs uppercase tracking-widest">Refresh</button>
             <p className="inline-flex items-center gap-2 rounded border border-cyan-400/50 bg-cyan-500/10 px-3 py-1 text-xs">
@@ -153,7 +183,10 @@ export default function ShopGrid() {
         </div>
       </header>
 
-      <section className="relative overflow-hidden rounded-xl border border-slate-300/30 bg-[#0b1728] shadow-[0_20px_80px_rgba(0,0,0,.45)]">
+      <section
+        onClick={() => setShowBundleInspect(true)}
+        className="relative cursor-pointer overflow-hidden rounded-xl border border-slate-300/30 bg-[#0b1728] shadow-[0_20px_80px_rgba(0,0,0,.45)]"
+      >
         <img src={data.bundleImage} alt={activeBundle.name} className="h-[430px] w-full object-cover opacity-75" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/35 to-black/75" />
         <div className="absolute inset-0 grid grid-cols-12 gap-4 p-5">
@@ -161,28 +194,14 @@ export default function ShopGrid() {
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-slate-300">Featured Collection</p>
               <h2 className="mt-2 text-5xl font-black uppercase">{activeBundle.name}</h2>
+              <p className="mt-3 text-xs uppercase tracking-[0.2em] text-cyan-200">Click anywhere to inspect the full bundle</p>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={handleBuyBundle} disabled={buyingBundle} className="rounded border-2 border-slate-100 bg-[#ece9df] px-8 py-3 text-lg font-bold text-black disabled:opacity-60">
+              <button onClick={(e) => { e.stopPropagation(); setShowBundleInspect(true); }} className="rounded border-2 border-slate-100 bg-[#ece9df] px-8 py-3 text-lg font-bold text-black">
                 <span className="inline-flex items-center gap-2"><VpLogo icon={data.vpIcon} />{activeBundle.priceVP.toLocaleString()}</span>
               </button>
             </div>
             {bundleError ? <p className="text-xs text-red-300">{bundleError}</p> : null}
-          </div>
-
-          <div className="col-span-4 rounded-lg border border-slate-300/20 bg-black/35 p-3 backdrop-blur-sm">
-            <p className="mb-2 text-xs uppercase tracking-[0.2em] text-slate-200">Inspect Bundle Contents</p>
-            <div className="max-h-[320px] space-y-2 overflow-y-auto pr-1">
-              {bundleSkins.map((skin) => (
-                <button key={skin.skinId} onClick={() => setSelected(skin)} className="flex w-full items-center gap-2 rounded border border-slate-500/70 bg-slate-900/60 p-2 text-left hover:border-cyan-300/70">
-                  <img src={skin.displayIcon || skin.showcaseImage} alt={skin.skinName} className="h-10 w-14 object-contain" />
-                  <div>
-                    <p className="truncate text-xs font-semibold uppercase">{skin.skinName}</p>
-                    <p className="text-[10px] uppercase text-slate-400">{skin.weaponName}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       </section>
@@ -213,12 +232,29 @@ export default function ShopGrid() {
       {selected ? (
         <GunInspectModal
           offer={selected}
-          userId={userData.user?.ID ?? 1}
+          userId={userData.user?.ID ?? userId}
           userVP={userData.user?.VP_Balance ?? 0}
           ownedLevel={userData.ownedSkins?.find((s) => s.SkinID === selected.skinId)?.LevelUnlocked ?? 0}
           onClose={() => {
             setSelected(null);
             refreshUser();
+          }}
+        />
+      ) : null}
+
+      {showBundleInspect ? (
+        <BundleInspectModal
+          bundle={activeBundle}
+          skins={bundleSkins}
+          userVP={userData.user?.VP_Balance ?? 0}
+          onClose={() => setShowBundleInspect(false)}
+          onBuyBundle={async () => {
+            try {
+              await handleBuyBundle();
+            } catch (e) {
+              setBundleError(e instanceof Error ? e.message : 'Bundle purchase failed');
+              throw e;
+            }
           }}
         />
       ) : null}

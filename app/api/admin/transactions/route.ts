@@ -15,13 +15,13 @@ export async function GET() {
           COUNT(*) AS transactionCount,
           COALESCE(SUM(VP_Cost), 0) AS totalVPSpent,
           COALESCE(SUM(CASE WHEN TransactionType = 'TOPUP' THEN VP_Cost ELSE 0 END), 0) AS totalVPTopup,
-          COALESCE(SUM(CASE WHEN TransactionType = 'UPGRADE' THEN VP_Cost ELSE 0 END), 0) AS totalVPPurchases,
+          COALESCE(SUM(CASE WHEN TransactionType IN ('PURCHASE','BUNDLE') THEN VP_Cost ELSE 0 END), 0) AS totalVPPurchases,
           COUNT(DISTINCT UserID) AS activeUsers,
           MAX(CreatedAt) AS lastPurchaseAt
        FROM Transactions`
     );
 
-    const [userRows] = await pool.query('SELECT ID, Username, VP_Balance FROM Users ORDER BY ID ASC');
+    const [userRows] = await pool.query('SELECT ID, Username, Email, VP_Balance, CreatedAt FROM Users ORDER BY ID ASC');
 
     return NextResponse.json({
       transactions: rows,

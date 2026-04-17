@@ -15,7 +15,9 @@ type Tx = {
 type User = {
   ID: number;
   Username: string;
+  Email?: string;
   VP_Balance: number;
+  CreatedAt?: string;
 };
 
 type Summary = {
@@ -43,7 +45,7 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [isResetting, setIsResetting] = useState(false);
   const [query, setQuery] = useState('');
-  const [txType, setTxType] = useState<'ALL' | 'TOPUP' | 'UPGRADE'>('ALL');
+  const [txType, setTxType] = useState<'ALL' | 'TOPUP' | 'PURCHASE' | 'BUNDLE'>('ALL');
   const [grantUserId, setGrantUserId] = useState(1);
   const [grantAmount, setGrantAmount] = useState(1000);
   const [isGranting, setIsGranting] = useState(false);
@@ -200,7 +202,9 @@ export default function AdminPage() {
             <tr>
               <th className="p-3">ID</th>
               <th className="p-3">Username</th>
+              <th className="p-3">Email</th>
               <th className="p-3">Current VP</th>
+              <th className="p-3">Joined</th>
             </tr>
           </thead>
           <tbody>
@@ -208,7 +212,9 @@ export default function AdminPage() {
               <tr key={user.ID} className="border-t border-slate-700">
                 <td className="p-3">{user.ID}</td>
                 <td className="p-3">{user.Username}</td>
+                <td className="p-3">{user.Email || '-'}</td>
                 <td className="p-3">{user.VP_Balance}</td>
+                <td className="p-3">{user.CreatedAt ? new Date(user.CreatedAt).toLocaleDateString() : '-'}</td>
               </tr>
             ))}
           </tbody>
@@ -249,9 +255,10 @@ export default function AdminPage() {
             onChange={(e) => setQuery(e.target.value)}
             className="w-64 rounded border border-slate-600 bg-slate-900 p-2 text-xs"
           />
-          <select value={txType} onChange={(e) => setTxType(e.target.value as 'ALL' | 'TOPUP' | 'UPGRADE')} className="rounded border border-slate-600 bg-slate-900 p-2 text-xs">
+          <select value={txType} onChange={(e) => setTxType(e.target.value as 'ALL' | 'TOPUP' | 'PURCHASE' | 'BUNDLE')} className="rounded border border-slate-600 bg-slate-900 p-2 text-xs">
             <option value="ALL">All Types</option>
-            <option value="UPGRADE">Upgrade</option>
+            <option value="PURCHASE">Skin Purchase</option>
+            <option value="BUNDLE">Bundle Purchase</option>
             <option value="TOPUP">Top Up</option>
           </select>
           <p className="text-xs text-slate-400">{filteredTransactions.length} records shown</p>
@@ -260,7 +267,7 @@ export default function AdminPage() {
           <thead className="bg-slate-900/50 text-slate-300">
             <tr>
               <th className="p-3">User ID</th>
-              <th className="p-3">Skin/Upgrade</th>
+              <th className="p-3">Item</th>
               <th className="p-3">VP Cost</th>
               <th className="p-3">Type</th>
               <th className="p-3">Date</th>
@@ -270,10 +277,10 @@ export default function AdminPage() {
             {filteredTransactions.map((tx) => (
               <tr key={tx.TransactionID} className="border-t border-slate-700">
                 <td className="p-3">{tx.UserID}</td>
-                <td className="p-3">{tx.SkinID} · L{tx.PurchasedLevel}</td>
+                <td className="p-3">{tx.SkinID}</td>
                 <td className="p-3">{tx.VP_Cost}</td>
                 <td className="p-3">
-                  <span className={`rounded px-2 py-1 text-xs ${tx.TransactionType === 'TOPUP' ? 'bg-emerald-900/60 text-emerald-200' : 'bg-cyan-900/60 text-cyan-200'}`}>
+                  <span className={`rounded px-2 py-1 text-xs ${tx.TransactionType === 'TOPUP' ? 'bg-emerald-900/60 text-emerald-200' : tx.TransactionType === 'BUNDLE' ? 'bg-fuchsia-900/60 text-fuchsia-200' : 'bg-cyan-900/60 text-cyan-200'}`}>
                     {tx.TransactionType}
                   </span>
                 </td>
