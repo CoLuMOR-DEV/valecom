@@ -4,13 +4,158 @@
 
 :root {
   color-scheme: dark;
+  --page-text: #f8fbff;
+  --muted-text: #9fb0c7;
+  --panel: rgba(9, 17, 31, 0.72);
+  --panel-strong: rgba(8, 13, 25, 0.9);
+  --panel-soft: rgba(16, 31, 52, 0.58);
+  --line: rgba(190, 213, 255, 0.18);
+  --line-strong: rgba(217, 232, 255, 0.32);
+  --field: rgba(6, 12, 23, 0.72);
+  --accent: #ff4655;
+  --accent-soft: rgba(255, 70, 85, 0.18);
+  --cyan: #3bf0d0;
+  --cyan-soft: rgba(59, 240, 208, 0.15);
+  --gold: #ffd166;
+  --shadow: 0 24px 90px rgba(0, 0, 0, 0.42);
+  --page-bg:
+    radial-gradient(
+      circle at 12% 8%,
+      rgba(55, 120, 210, 0.42),
+      transparent 31%
+    ),
+    radial-gradient(
+      circle at 84% 18%,
+      rgba(255, 70, 85, 0.26),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at 55% 92%,
+      rgba(59, 240, 208, 0.15),
+      transparent 34%
+    ),
+    linear-gradient(135deg, #08101d 0%, #0b1221 42%, #05070d 100%);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --page-text: #0b1220;
+  --muted-text: #55657a;
+  --panel: rgba(255, 255, 255, 0.68);
+  --panel-strong: rgba(255, 255, 255, 0.86);
+  --panel-soft: rgba(239, 246, 255, 0.62);
+  --line: rgba(15, 23, 42, 0.14);
+  --line-strong: rgba(15, 23, 42, 0.22);
+  --field: rgba(255, 255, 255, 0.7);
+  --accent: #e72f44;
+  --accent-soft: rgba(231, 47, 68, 0.13);
+  --cyan: #047c89;
+  --cyan-soft: rgba(4, 124, 137, 0.12);
+  --gold: #af6d00;
+  --shadow: 0 24px 80px rgba(18, 36, 62, 0.18);
+  --page-bg:
+    radial-gradient(circle at 12% 8%, rgba(4, 124, 137, 0.18), transparent 32%),
+    radial-gradient(
+      circle at 88% 16%,
+      rgba(255, 70, 85, 0.16),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at 52% 88%,
+      rgba(59, 130, 246, 0.16),
+      transparent 34%
+    ),
+    linear-gradient(135deg, #f8fbff 0%, #eef5ff 45%, #fdf2f4 100%);
+}
+
+html {
+  min-height: 100%;
+  background: #05070d;
 }
 
 body {
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 20% 10%, rgba(34, 91, 170, 0.4), transparent 35%),
-    radial-gradient(circle at 80% 50%, rgba(163, 37, 87, 0.26), transparent 40%),
-    linear-gradient(180deg, #091120 0%, #060b15 70%, #04060c 100%);
-  color: #fff;
+  overflow-x: hidden;
+  background: var(--page-bg);
+  color: var(--page-text);
+}
+
+body::before {
+  pointer-events: none;
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(circle at center, black, transparent 78%);
+}
+
+:root[data-theme="light"] body::before {
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.055) 1px, transparent 1px);
+}
+
+@layer components {
+  .glass-panel {
+    border: 1px solid var(--line);
+    background: linear-gradient(135deg, var(--panel-strong), var(--panel));
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(22px) saturate(140%);
+  }
+
+  .glass-card {
+    border: 1px solid var(--line);
+    background: linear-gradient(145deg, var(--panel), var(--panel-soft));
+    box-shadow: 0 16px 60px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(18px) saturate(145%);
+  }
+
+  .glass-field {
+    border: 1px solid var(--line-strong);
+    background: var(--field);
+    color: var(--page-text);
+  }
+
+  .muted-text {
+    color: var(--muted-text);
+  }
+
+  .theme-toggle {
+    border-color: var(--line-strong);
+    background: var(--panel-soft);
+    color: var(--page-text);
+  }
+
+  .theme-toggle:hover {
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 3px var(--cyan-soft);
+  }
+
+  .nav-action {
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.055);
+    color: var(--page-text);
+  }
+
+  .nav-action:hover {
+    transform: translateY(-1px);
+    border-color: var(--cyan);
+    background: var(--cyan-soft);
+  }
+
+  .valorant-primary {
+    background: linear-gradient(135deg, var(--accent), #ff7a45);
+    color: white;
+    box-shadow: 0 14px 35px rgba(255, 70, 85, 0.28);
+  }
+
+  .valorant-outline {
+    border: 1px solid var(--line-strong);
+    background: var(--panel-soft);
+    color: var(--page-text);
+  }
 }

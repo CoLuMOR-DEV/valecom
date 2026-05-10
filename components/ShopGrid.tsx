@@ -1,28 +1,40 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import GunInspectModal from './GunInspectModal';
-import PurchaseCompleteModal from './PurchaseCompleteModal';
-import BundleInspectModal from './BundleInspectModal';
-import type { ShopPayload, SkinOffer } from '@/types/shop';
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import GunInspectModal from "./GunInspectModal";
+import PurchaseCompleteModal from "./PurchaseCompleteModal";
+import BundleInspectModal from "./BundleInspectModal";
+import ThemeToggle from "./ThemeToggle";
+import type { ShopPayload, SkinOffer } from "@/types/shop";
 
 type Owned = { SkinID: string; LevelUnlocked: number };
 type SessionUser = { ID: number; Username: string; VP_Balance: number };
 type UserResponse = { user?: SessionUser; ownedSkins?: Owned[] };
 type PurchaseDone = { title: string; subtitle: string; image?: string } | null;
 
-const fallbackUser = { user: { ID: 0, VP_Balance: 0, Username: 'Guest' }, ownedSkins: [] as Owned[] };
+const fallbackUser = {
+  user: { ID: 0, VP_Balance: 0, Username: "Guest" },
+  ownedSkins: [] as Owned[],
+};
 
 function VpLogo({ icon }: { icon?: string }) {
-  return icon ? <img src={icon} alt="Valorant Points" className="h-5 w-5 rounded-full border border-slate-500/70" /> : <span className="text-xs">VP</span>;
+  return icon ? (
+    <img
+      src={icon}
+      alt="Valorant Points"
+      className="h-5 w-5 rounded-full border border-slate-500/70"
+    />
+  ) : (
+    <span className="text-xs">VP</span>
+  );
 }
 
 function formatRemaining(ms: number) {
   const total = Math.max(0, Math.floor(ms / 1000));
-  const h = String(Math.floor(total / 3600)).padStart(2, '0');
-  const m = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
-  const s = String(total % 60).padStart(2, '0');
+  const h = String(Math.floor(total / 3600)).padStart(2, "0");
+  const m = String(Math.floor((total % 3600) / 60)).padStart(2, "0");
+  const s = String(total % 60).padStart(2, "0");
   return `${h}:${m}:${s}`;
 }
 
@@ -34,17 +46,17 @@ export default function ShopGrid() {
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const [showBundleInspect, setShowBundleInspect] = useState(false);
   const [now, setNow] = useState(Date.now());
-  const [bundleError, setBundleError] = useState('');
+  const [bundleError, setBundleError] = useState("");
   const [completed, setCompleted] = useState<PurchaseDone>(null);
 
   useEffect(() => {
-    const raw = window.localStorage.getItem('valora-user');
+    const raw = window.localStorage.getItem("valora-user");
     if (!raw) return;
 
     try {
       setSessionUser(JSON.parse(raw));
     } catch {
-      window.localStorage.removeItem('valora-user');
+      window.localStorage.removeItem("valora-user");
     }
   }, []);
 
@@ -52,20 +64,23 @@ export default function ShopGrid() {
   const canPurchase = Boolean(sessionUser?.ID);
 
   const getStoreSeed = () => {
-    if (typeof window === 'undefined') return Date.now();
+    if (typeof window === "undefined") return Date.now();
     const nextReset = new Date();
     nextReset.setUTCHours(0, 0, 0, 0);
     nextReset.setUTCDate(nextReset.getUTCDate() + 1);
 
-    const savedSeed = window.localStorage.getItem('valora-shop-seed');
-    const savedReset = window.localStorage.getItem('valora-shop-seed-reset');
+    const savedSeed = window.localStorage.getItem("valora-shop-seed");
+    const savedReset = window.localStorage.getItem("valora-shop-seed-reset");
     if (savedSeed && savedReset && Number(savedReset) > Date.now()) {
       return Number(savedSeed);
     }
 
     const newSeed = Date.now();
-    window.localStorage.setItem('valora-shop-seed', String(newSeed));
-    window.localStorage.setItem('valora-shop-seed-reset', String(nextReset.getTime()));
+    window.localStorage.setItem("valora-shop-seed", String(newSeed));
+    window.localStorage.setItem(
+      "valora-shop-seed-reset",
+      String(nextReset.getTime()),
+    );
     return newSeed;
   };
 
@@ -73,12 +88,15 @@ export default function ShopGrid() {
     const seed = forceNewSeed
       ? (() => {
           const newSeed = Date.now();
-          if (typeof window !== 'undefined') {
+          if (typeof window !== "undefined") {
             const nextReset = new Date();
             nextReset.setUTCHours(0, 0, 0, 0);
             nextReset.setUTCDate(nextReset.getUTCDate() + 1);
-            window.localStorage.setItem('valora-shop-seed', String(newSeed));
-            window.localStorage.setItem('valora-shop-seed-reset', String(nextReset.getTime()));
+            window.localStorage.setItem("valora-shop-seed", String(newSeed));
+            window.localStorage.setItem(
+              "valora-shop-seed-reset",
+              String(nextReset.getTime()),
+            );
           }
           return newSeed;
         })()
@@ -86,7 +104,9 @@ export default function ShopGrid() {
 
     return fetch(`/api/shop?seed=${seed}`)
       .then((res) => res.json())
-      .then((json) => (json.featured && Array.isArray(json.daily) ? setData(json) : null))
+      .then((json) =>
+        json.featured && Array.isArray(json.daily) ? setData(json) : null,
+      )
       .catch(() => null);
   };
 
@@ -99,10 +119,15 @@ export default function ShopGrid() {
     fetch(`/api/user/${userId}`)
       .then((res) => res.json())
       .then((json) => {
-        const payload = json?.user ? { user: json.user, ownedSkins: json.ownedSkins ?? [] } : fallbackUser;
+        const payload = json?.user
+          ? { user: json.user, ownedSkins: json.ownedSkins ?? [] }
+          : fallbackUser;
         setUserData(payload);
-        if (payload.user && typeof window !== 'undefined') {
-          window.localStorage.setItem('valora-user', JSON.stringify(payload.user));
+        if (payload.user && typeof window !== "undefined") {
+          window.localStorage.setItem(
+            "valora-user",
+            JSON.stringify(payload.user),
+          );
           setSessionUser(payload.user);
         }
       })
@@ -122,154 +147,278 @@ export default function ShopGrid() {
     return () => clearInterval(timer);
   }, []);
 
-  const remaining = useMemo(() => formatRemaining(new Date(data?.dailyResetAtISO || 0).getTime() - now), [data?.dailyResetAtISO, now]);
+  const remaining = useMemo(
+    () => formatRemaining(new Date(data?.dailyResetAtISO || 0).getTime() - now),
+    [data?.dailyResetAtISO, now],
+  );
   const activeBundle = data?.featuredBundle;
-  const bundleSkins = useMemo(() => data?.catalog.filter((skin) => activeBundle?.skinIds.includes(skin.skinId)) ?? [], [activeBundle?.skinIds, data?.catalog]);
+  const bundleSkins = useMemo(
+    () =>
+      data?.catalog.filter((skin) =>
+        activeBundle?.skinIds.includes(skin.skinId),
+      ) ?? [],
+    [activeBundle?.skinIds, data?.catalog],
+  );
 
   const handleBuyBundle = async () => {
     if (!activeBundle || !canPurchase) return;
-    setBundleError('');
+    setBundleError("");
 
     if ((userData.user?.VP_Balance ?? 0) < activeBundle.priceVP) {
-      throw new Error('Not enough VP to buy this bundle.');
+      throw new Error("Not enough VP to buy this bundle.");
     }
 
-    const res = await fetch('/api/purchase-bundle', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, bundleId: activeBundle.id, priceVP: activeBundle.priceVP, skinIds: activeBundle.skinIds })
+    const res = await fetch("/api/purchase-bundle", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        bundleId: activeBundle.id,
+        priceVP: activeBundle.priceVP,
+        skinIds: activeBundle.skinIds,
+      }),
     });
     const json = await res.json();
-    if (!res.ok) throw new Error(json.error ?? 'Bundle purchase failed');
+    if (!res.ok) throw new Error(json.error ?? "Bundle purchase failed");
 
     await refreshUser();
-    setCompleted({ title: activeBundle.name, subtitle: 'Bundle Purchased', image: data?.bundleImage });
+    setCompleted({
+      title: activeBundle.name,
+      subtitle: "Bundle Purchased",
+      image: data?.bundleImage,
+    });
   };
 
-  if (!data || !activeBundle) return <div className="p-8 text-xl uppercase tracking-widest text-slate-300">Loading store...</div>;
+  if (!data || !activeBundle)
+    return (
+      <div className="p-8 text-xl uppercase tracking-widest muted-text">
+        Loading store...
+      </div>
+    );
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-[1350px] px-3 py-4 text-white md:px-4 md:py-6">
-      <header className="mb-4 rounded-xl border border-slate-700/60 bg-gradient-to-r from-[#0c1627] to-[#121f35] p-3 shadow-lg md:p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+    <main className="mx-auto grid min-h-screen w-full max-w-[1450px] gap-4 px-3 py-4 md:px-4 md:py-6 lg:grid-cols-[280px_1fr]">
+      <aside className="glass-panel sticky top-4 z-20 h-fit rounded-[2rem] p-4 lg:min-h-[calc(100vh-2rem)]">
+        <div className="flex items-start justify-between gap-3 lg:block">
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Valora</p>
-            <h1 className="text-2xl font-black uppercase">Skin Shop</h1>
-            <p className="text-xs text-slate-400">{canPurchase ? `Signed in as ${userData.user?.Username ?? sessionUser?.Username}` : 'Guest mode: inspect only'}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button className="rounded border border-cyan-400/60 bg-cyan-500/15 px-3 py-1 text-xs uppercase tracking-widest">Daily Offers</button>
-            <button onClick={() => (canPurchase ? router.push(`/topup?userId=${userId}`) : router.push('/login'))} className="rounded border border-emerald-400/60 bg-emerald-500/10 px-3 py-1 text-xs uppercase tracking-widest text-emerald-100">
-              Top Up VP
-            </button>
-            <button onClick={() => (canPurchase ? router.push(`/loadout?userId=${userId}`) : router.push('/login'))} className="rounded border border-fuchsia-400/60 bg-fuchsia-500/10 px-3 py-1 text-xs uppercase tracking-widest text-fuchsia-100">
-              My Loadout
-            </button>
-            <button onClick={() => router.push('/admin')} className="rounded border border-amber-300/60 bg-amber-500/10 px-3 py-1 text-xs uppercase tracking-widest text-amber-100">
-              Admin
-            </button>
-            {canPurchase ? (
-              <button
-                onClick={() => {
-                  window.localStorage.removeItem('valora-user');
-                  setSessionUser(null);
-                }}
-                className="rounded border border-slate-400/70 bg-black/30 px-3 py-1 text-xs uppercase tracking-widest"
-              >
-                Logout
-              </button>
-            ) : (
-              <button onClick={() => router.push('/login')} className="rounded border border-slate-400/70 bg-black/30 px-3 py-1 text-xs uppercase tracking-widest">Login / Sign Up</button>
-            )}
-            <button onClick={() => refreshStore(true)} className="rounded border border-slate-400/70 bg-black/30 px-3 py-1 text-xs uppercase tracking-widest">Refresh</button>
-            <p className="inline-flex items-center gap-2 rounded border border-cyan-400/50 bg-cyan-500/10 px-3 py-1 text-xs">
-              <VpLogo icon={data.vpIcon} /> {userData.user?.VP_Balance ?? 0}
+            <p className="text-xs uppercase tracking-[0.35em] muted-text">
+              Valora
+            </p>
+            <h1 className="mt-1 text-3xl font-black uppercase leading-none">
+              Skin Shop
+            </h1>
+            <p className="mt-2 text-xs muted-text">
+              {canPurchase
+                ? `Signed in as ${userData.user?.Username ?? sessionUser?.Username}`
+                : "Guest mode: inspect only"}
             </p>
           </div>
-        </div>
-      </header>
-
-      <section
-        onClick={() => setShowBundleInspect(true)}
-        className="relative cursor-pointer overflow-hidden rounded-xl border border-slate-300/30 bg-[#0b1728] shadow-[0_20px_80px_rgba(0,0,0,.45)]"
-      >
-        <img src={data.bundleImage} alt={activeBundle.name} className="h-[260px] w-full object-cover opacity-75 md:h-[430px]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/35 to-black/75" />
-        <div className="absolute inset-0 grid grid-cols-1 gap-4 p-4 md:grid-cols-12 md:p-5">
-          <div className="flex flex-col justify-between md:col-span-8">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-300">Featured Collection</p>
-              <h2 className="mt-2 text-3xl font-black uppercase md:text-5xl">{activeBundle.name}</h2>
-              <p className="mt-3 text-xs uppercase tracking-[0.2em] text-cyan-200">Click anywhere to inspect the full bundle with levels</p>
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-              <button onClick={(e) => { e.stopPropagation(); setShowBundleInspect(true); }} className="rounded border-2 border-slate-100 bg-[#ece9df] px-6 py-2 text-lg font-bold text-black md:px-8 md:py-3">
-                <span className="inline-flex items-center gap-2"><VpLogo icon={data.vpIcon} />{activeBundle.priceVP.toLocaleString()}</span>
-              </button>
-            </div>
-            {bundleError ? <p className="text-xs text-red-300">{bundleError}</p> : null}
+          <div className="lg:mt-5">
+            <ThemeToggle />
           </div>
         </div>
-      </section>
 
-      <section className="my-5 rounded-lg border border-slate-700/50 bg-[#0d1d35] p-3">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm uppercase tracking-[0.2em]">Daily Offers · <span className="text-amber-300">{remaining}</span></p>
-          <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Daily rotation locked until next reset or manual refresh</p>
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
-          {data.daily.map((offer) => (
-            <button key={offer.skinId} onClick={() => setSelected(offer)} className="group overflow-hidden rounded border border-slate-400/40 bg-[#0e2038] text-left transition hover:-translate-y-0.5 hover:border-cyan-300/60">
-              <div className="h-40 bg-gradient-to-br from-[#573455] to-[#142c4e] p-2">
-                <img src={offer.displayIcon || offer.showcaseImage} alt={offer.skinName} className="h-full w-full object-contain" />
-              </div>
-              <div className="flex items-center justify-between bg-black/45 px-3 py-2">
-                <div>
-                  <p className="truncate text-sm font-semibold uppercase tracking-wider">{offer.skinName}</p>
-                  <p className="text-[10px] uppercase tracking-widest text-slate-400">{offer.weaponName}</p>
-                </div>
-                <p className="inline-flex items-center gap-1 text-sm"><VpLogo icon={data.vpIcon} /> {offer.priceVP}</p>
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {selected ? (
-        <GunInspectModal
-          offer={selected}
-          userId={userData.user?.ID ?? 0}
-          userVP={userData.user?.VP_Balance ?? 0}
-          ownedLevel={userData.ownedSkins?.find((s) => s.SkinID === selected.skinId)?.LevelUnlocked ?? 0}
-          canPurchase={canPurchase}
-          onRequireLogin={() => router.push('/login')}
-          onClose={() => {
-            setSelected(null);
-            refreshUser();
-          }}
-        />
-      ) : null}
-
-      {showBundleInspect ? (
-        <BundleInspectModal
-          bundle={activeBundle}
-          skins={bundleSkins}
-          userVP={userData.user?.VP_Balance ?? 0}
-          canPurchase={canPurchase}
-          onClose={() => setShowBundleInspect(false)}
-          onRequireLogin={() => router.push('/login')}
-          onBuyBundle={async () => {
-            try {
-              await handleBuyBundle();
-            } catch (e) {
-              setBundleError(e instanceof Error ? e.message : 'Bundle purchase failed');
-              throw e;
+        <div className="mt-5 grid gap-2">
+          <p className="rounded-2xl border border-cyan-400/40 bg-cyan-500/10 px-3 py-3 text-xs font-bold uppercase tracking-[0.25em] text-cyan-100">
+            Daily Offers
+          </p>
+          <button
+            onClick={() =>
+              canPurchase
+                ? router.push(`/topup?userId=${userId}`)
+                : router.push("/login")
             }
-          }}
-        />
-      ) : null}
+            className="nav-action rounded-2xl px-3 py-3 text-left text-xs font-bold uppercase tracking-[0.22em] transition"
+          >
+            Top Up VP
+          </button>
+          <button
+            onClick={() =>
+              canPurchase
+                ? router.push(`/loadout?userId=${userId}`)
+                : router.push("/login")
+            }
+            className="nav-action rounded-2xl px-3 py-3 text-left text-xs font-bold uppercase tracking-[0.22em] transition"
+          >
+            My Loadout
+          </button>
+          <button
+            onClick={() => router.push("/admin")}
+            className="nav-action rounded-2xl px-3 py-3 text-left text-xs font-bold uppercase tracking-[0.22em] transition"
+          >
+            Admin Panel
+          </button>
+          {canPurchase ? (
+            <button
+              onClick={() => {
+                window.localStorage.removeItem("valora-user");
+                setSessionUser(null);
+              }}
+              className="nav-action rounded-2xl px-3 py-3 text-left text-xs font-bold uppercase tracking-[0.22em] transition"
+            >
+              Logout
+            </button>
+          ) : (
+            <button
+              onClick={() => router.push("/login")}
+              className="nav-action rounded-2xl px-3 py-3 text-left text-xs font-bold uppercase tracking-[0.22em] transition"
+            >
+              Login / Sign Up
+            </button>
+          )}
+          <button
+            onClick={() => refreshStore(true)}
+            className="nav-action rounded-2xl px-3 py-3 text-left text-xs font-bold uppercase tracking-[0.22em] transition"
+          >
+            Refresh Store
+          </button>
+        </div>
 
-      {completed ? <PurchaseCompleteModal title={completed.title} subtitle={completed.subtitle} image={completed.image} onClose={() => setCompleted(null)} /> : null}
+        <div className="mt-5 rounded-[1.5rem] border border-cyan-400/30 bg-cyan-500/10 p-4">
+          <p className="text-[10px] uppercase tracking-[0.28em] muted-text">
+            Wallet Balance
+          </p>
+          <p className="mt-2 inline-flex items-center gap-2 text-2xl font-black">
+            <VpLogo icon={data.vpIcon} />{" "}
+            {(userData.user?.VP_Balance ?? 0).toLocaleString()}
+          </p>
+        </div>
+      </aside>
+
+      <div className="min-w-0">
+        <section
+          onClick={() => setShowBundleInspect(true)}
+          className="glass-card relative cursor-pointer overflow-hidden rounded-[2rem]"
+        >
+          <img
+            src={data.bundleImage}
+            alt={activeBundle.name}
+            className="h-[280px] w-full object-cover opacity-80 md:h-[470px]"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/25 to-black/70" />
+          <div className="absolute inset-0 grid grid-cols-1 gap-4 p-4 md:grid-cols-12 md:p-5">
+            <div className="flex flex-col justify-between md:col-span-8">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-300">
+                  Featured Collection
+                </p>
+                <h2 className="mt-2 text-3xl font-black uppercase md:text-5xl">
+                  {activeBundle.name}
+                </h2>
+                <p className="mt-3 text-xs uppercase tracking-[0.2em] text-cyan-200">
+                  Click anywhere to inspect the full bundle with levels
+                </p>
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowBundleInspect(true);
+                  }}
+                  className="valorant-primary rounded-2xl px-6 py-3 text-lg font-bold md:px-8"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <VpLogo icon={data.vpIcon} />
+                    {activeBundle.priceVP.toLocaleString()}
+                  </span>
+                </button>
+              </div>
+              {bundleError ? (
+                <p className="text-xs text-red-300">{bundleError}</p>
+              ) : null}
+            </div>
+          </div>
+        </section>
+
+        <section className="glass-panel my-5 rounded-[2rem] p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm uppercase tracking-[0.2em]">
+              Daily Offers · <span className="text-amber-300">{remaining}</span>
+            </p>
+            <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+              Daily rotation locked until next reset or manual refresh
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
+            {data.daily.map((offer) => (
+              <button
+                key={offer.skinId}
+                onClick={() => setSelected(offer)}
+                className="glass-card group overflow-hidden rounded-[1.5rem] text-left transition hover:-translate-y-1 hover:border-cyan-300/70"
+              >
+                <div className="h-40 bg-gradient-to-br from-rose-500/20 via-slate-900/30 to-cyan-500/20 p-3">
+                  <img
+                    src={offer.displayIcon || offer.showcaseImage}
+                    alt={offer.skinName}
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+                <div className="flex items-center justify-between border-t border-white/10 bg-black/25 px-3 py-3">
+                  <div>
+                    <p className="truncate text-sm font-semibold uppercase tracking-wider">
+                      {offer.skinName}
+                    </p>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-400">
+                      {offer.weaponName}
+                    </p>
+                  </div>
+                  <p className="inline-flex items-center gap-1 text-sm">
+                    <VpLogo icon={data.vpIcon} /> {offer.priceVP}
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {selected ? (
+          <GunInspectModal
+            offer={selected}
+            userId={userData.user?.ID ?? 0}
+            userVP={userData.user?.VP_Balance ?? 0}
+            ownedLevel={
+              userData.ownedSkins?.find((s) => s.SkinID === selected.skinId)
+                ?.LevelUnlocked ?? 0
+            }
+            canPurchase={canPurchase}
+            onRequireLogin={() => router.push("/login")}
+            onClose={() => {
+              setSelected(null);
+              refreshUser();
+            }}
+          />
+        ) : null}
+
+        {showBundleInspect ? (
+          <BundleInspectModal
+            bundle={activeBundle}
+            skins={bundleSkins}
+            userVP={userData.user?.VP_Balance ?? 0}
+            canPurchase={canPurchase}
+            onClose={() => setShowBundleInspect(false)}
+            onRequireLogin={() => router.push("/login")}
+            onBuyBundle={async () => {
+              try {
+                await handleBuyBundle();
+              } catch (e) {
+                setBundleError(
+                  e instanceof Error ? e.message : "Bundle purchase failed",
+                );
+                throw e;
+              }
+            }}
+          />
+        ) : null}
+
+        {completed ? (
+          <PurchaseCompleteModal
+            title={completed.title}
+            subtitle={completed.subtitle}
+            image={completed.image}
+            onClose={() => setCompleted(null)}
+          />
+        ) : null}
+      </div>
     </main>
   );
 }

@@ -2,9 +2,9 @@
 
 ## What is improved in this revision
 - Real DB-backed purchase persistence end-to-end on localhost (XAMPP MySQL).
-- Upgrade recommendation now uses MySQL function `CalculateUpgradeCost` via API.
-- UI reads live user VP/owned level state from DB instead of a hardcoded balance.
-- Purchase flow writes two transaction records (`TOPUP`, `UPGRADE`) and updates `OwnedSkins` + `Users.VP_Balance`.
+- ACID-focused stored procedures for top-ups, single-skin purchases, bundle purchases, and loadout saves.
+- Trigger-based auditing for transactions and loadout equip/switch actions.
+- UI reads live user VP/owned skin/loadout state from DB with localStorage fallback.
 
 ## Architecture
 - **Frontend:** Next.js App Router + Tailwind + Framer Motion.
@@ -25,14 +25,17 @@
    ```
 5. Open:
    - `http://localhost:3000` (shop)
+   - `http://localhost:3000/loadout` (loadout)
    - `http://localhost:3000/admin` (admin table)
 
 ## API map
 - `GET /api/shop` → featured + daily skin data from Valorant API.
 - `GET /api/user/1` → live VP balance + owned skins.
-- `POST /api/upgrade-cost` → calls `CalculateUpgradeCost`.
-- `POST /api/topup` → adds VP and logs TOPUP transaction.
-- `POST /api/purchase` → calls `ProcessUpgradePurchase` (deduct VP, unlock level, log UPGRADE).
+- `POST /api/topup` → `ProcessTopup` stored procedure.
+- `POST /api/purchase-skin` → `ProcessSkinPurchase` stored procedure for level 1 purchases.
+- `POST /api/purchase-bundle` → `ProcessBundlePurchase` stored procedure.
+- `GET /api/loadout?userId=1` → fetch persisted loadout selections.
+- `POST /api/loadout` → persist loadout selections via `SaveLoadoutSelection`.
 - `GET /api/admin/transactions` → admin table rows.
 
 ## Admin route
