@@ -49,6 +49,7 @@ export default function ShopGrid() {
   const [bundleError, setBundleError] = useState("");
   const [completed, setCompleted] = useState<PurchaseDone>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const raw = window.localStorage.getItem("valora-user");
@@ -198,14 +199,16 @@ export default function ShopGrid() {
     );
 
   return (
-    <main className="mx-auto grid min-h-screen w-full max-w-[1450px] gap-4 px-3 py-4 md:px-4 md:py-6 lg:grid-cols-[220px_1fr]">
-      <aside className="glass-panel sticky top-4 z-20 flex h-fit flex-col rounded-[1.75rem] p-3 lg:min-h-[calc(100vh-2rem)]">
+    <main
+      className={`mx-auto grid min-h-screen w-full max-w-[1450px] gap-4 px-3 py-4 transition-[grid-template-columns] duration-300 md:px-4 md:py-6 ${sidebarCollapsed ? "lg:grid-cols-[82px_1fr]" : "lg:grid-cols-[220px_1fr]"}`}
+    >
+      <aside className="glass-panel z-20 flex h-fit flex-col rounded-[1.75rem] p-3 lg:sticky lg:top-4 lg:min-h-[calc(100vh-2rem)]">
         <div className="rounded-[1.35rem] border border-white/10 bg-white/5 p-3">
           <div className="flex items-center gap-3">
             <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-valorant-accent via-rose-500 to-cyan-300 text-2xl font-black text-white shadow-[0_14px_35px_rgba(255,70,85,0.35)]">
               V
             </div>
-            <div className="min-w-0">
+            <div className={`min-w-0 ${sidebarCollapsed ? "lg:hidden" : ""}`}>
               <p className="text-[10px] font-bold uppercase tracking-[0.32em] text-cyan-200">
                 Valora
               </p>
@@ -214,19 +217,38 @@ export default function ShopGrid() {
               </h1>
             </div>
           </div>
-          <p className="mt-3 text-[11px] muted-text">
-            {canPurchase
-              ? `Signed in as ${userData.user?.Username ?? sessionUser?.Username}`
-              : "Guest mode: inspect only"}
-          </p>
-          <div className="mt-3">
+          <div className={`mt-3 ${sidebarCollapsed ? "lg:hidden" : ""}`}>
             <ThemeToggle />
           </div>
+          <button
+            type="button"
+            onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+            className="nav-action mt-3 hidden w-full rounded-2xl px-3 py-2 text-[11px] font-bold uppercase tracking-[0.18em] transition lg:block"
+            aria-label={
+              sidebarCollapsed ? "Expand side panel" : "Minimize side panel"
+            }
+          >
+            {sidebarCollapsed ? "→" : "Minimize"}
+          </button>
         </div>
 
-        <div className="mt-4 grid flex-1 content-start gap-2">
-          <p className="rounded-2xl border border-cyan-400/40 bg-cyan-500/10 px-3 py-2.5 text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-100">
-            ✦ Daily
+        <div className="mt-4 grid grid-cols-3 gap-2 lg:flex-1 lg:grid-cols-1 lg:content-start">
+          <p
+            className={`rounded-2xl border border-cyan-400/40 bg-cyan-500/10 px-3 py-2.5 text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-100 ${sidebarCollapsed ? "lg:text-center" : "text-left"}`}
+          >
+            <span className="lg:hidden">✦ Daily Offers</span>
+            <span
+              className={
+                sidebarCollapsed ? "hidden lg:inline" : "hidden lg:hidden"
+              }
+            >
+              ✦
+            </span>
+            <span
+              className={sidebarCollapsed ? "lg:hidden" : "hidden lg:inline"}
+            >
+              ✦ Daily
+            </span>
           </p>
           <button
             onClick={() =>
@@ -234,9 +256,21 @@ export default function ShopGrid() {
                 ? router.push(`/topup?userId=${userId}`)
                 : router.push("/login")
             }
-            className="nav-action rounded-2xl px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.2em] transition"
+            className={`nav-action rounded-2xl px-3 py-2.5 text-[11px] font-bold uppercase tracking-[0.2em] transition ${sidebarCollapsed ? "lg:text-center" : "text-left"}`}
           >
-            + Top Up
+            <span className="lg:hidden">+ Top Up VP</span>
+            <span
+              className={
+                sidebarCollapsed ? "hidden lg:inline" : "hidden lg:hidden"
+              }
+            >
+              +
+            </span>
+            <span
+              className={sidebarCollapsed ? "lg:hidden" : "hidden lg:inline"}
+            >
+              + Top Up
+            </span>
           </button>
           <button
             onClick={() =>
@@ -244,15 +278,39 @@ export default function ShopGrid() {
                 ? router.push(`/loadout?userId=${userId}`)
                 : router.push("/login")
             }
-            className="nav-action rounded-2xl px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.2em] transition"
+            className={`nav-action rounded-2xl px-3 py-2.5 text-[11px] font-bold uppercase tracking-[0.2em] transition ${sidebarCollapsed ? "lg:text-center" : "text-left"}`}
           >
-            ◇ Loadout
+            <span className="lg:hidden">◇ Loadout</span>
+            <span
+              className={
+                sidebarCollapsed ? "hidden lg:inline" : "hidden lg:hidden"
+              }
+            >
+              ◇
+            </span>
+            <span
+              className={sidebarCollapsed ? "lg:hidden" : "hidden lg:inline"}
+            >
+              ◇ Loadout
+            </span>
           </button>
           <button
             onClick={() => refreshStore(true)}
-            className="nav-action rounded-2xl px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.2em] transition"
+            className={`nav-action rounded-2xl px-3 py-2.5 text-[11px] font-bold uppercase tracking-[0.2em] transition ${sidebarCollapsed ? "lg:text-center" : "text-left"}`}
           >
-            ↻ Refresh
+            <span className="lg:hidden">↻ Refresh Store</span>
+            <span
+              className={
+                sidebarCollapsed ? "hidden lg:inline" : "hidden lg:hidden"
+              }
+            >
+              ↻
+            </span>
+            <span
+              className={sidebarCollapsed ? "lg:hidden" : "hidden lg:inline"}
+            >
+              ↻ Refresh
+            </span>
           </button>
         </div>
 
@@ -273,7 +331,9 @@ export default function ShopGrid() {
                   "G"
                 ).slice(0, 1)}
               </div>
-              <div className="min-w-0 flex-1">
+              <div
+                className={`min-w-0 flex-1 ${sidebarCollapsed ? "lg:hidden" : ""}`}
+              >
                 <p className="truncate text-xs font-black uppercase">
                   {canPurchase
                     ? (userData.user?.Username ?? sessionUser?.Username)
@@ -284,18 +344,16 @@ export default function ShopGrid() {
                   {(userData.user?.VP_Balance ?? 0).toLocaleString()} VP
                 </p>
               </div>
-              <span className="text-xs muted-text">⌄</span>
+              <span
+                className={`text-xs muted-text ${sidebarCollapsed ? "lg:hidden" : ""}`}
+              >
+                ⌄
+              </span>
             </div>
           </button>
 
           {profileOpen && canPurchase ? (
             <div className="absolute bottom-full left-0 right-0 z-30 mb-2 rounded-2xl border border-white/15 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-xl">
-              <button
-                onClick={() => router.push(`/loadout?userId=${userId}`)}
-                className="w-full rounded-xl px-3 py-2 text-left text-xs font-bold uppercase tracking-[0.18em] transition hover:bg-white/10"
-              >
-                Open Loadout
-              </button>
               <button
                 onClick={() => {
                   window.localStorage.removeItem("valora-user");
@@ -361,11 +419,8 @@ export default function ShopGrid() {
             <p className="text-sm uppercase tracking-[0.2em]">
               Daily Offers · <span className="text-amber-300">{remaining}</span>
             </p>
-            <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
-              Daily rotation locked until next reset or manual refresh
-            </p>
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {data.daily.map((offer) => (
               <button
                 key={offer.skinId}
@@ -379,8 +434,8 @@ export default function ShopGrid() {
                     className="h-full w-full object-contain"
                   />
                 </div>
-                <div className="flex items-center justify-between border-t border-white/10 bg-black/25 px-3 py-3">
-                  <div>
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-t border-white/10 bg-black/25 px-3 py-3">
+                  <div className="min-w-0">
                     <p className="truncate text-sm font-semibold uppercase tracking-wider">
                       {offer.skinName}
                     </p>
@@ -388,8 +443,9 @@ export default function ShopGrid() {
                       {offer.weaponName}
                     </p>
                   </div>
-                  <p className="inline-flex items-center gap-1 text-sm">
-                    <VpLogo icon={data.vpIcon} /> {offer.priceVP}
+                  <p className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-sm font-bold">
+                    <VpLogo icon={data.vpIcon} />{" "}
+                    {offer.priceVP.toLocaleString()}
                   </p>
                 </div>
               </button>
