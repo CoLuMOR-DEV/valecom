@@ -48,6 +48,7 @@ export default function ShopGrid() {
   const [now, setNow] = useState(Date.now());
   const [bundleError, setBundleError] = useState("");
   const [completed, setCompleted] = useState<PurchaseDone>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     const raw = window.localStorage.getItem("valora-user");
@@ -197,30 +198,35 @@ export default function ShopGrid() {
     );
 
   return (
-    <main className="mx-auto grid min-h-screen w-full max-w-[1450px] gap-4 px-3 py-4 md:px-4 md:py-6 lg:grid-cols-[280px_1fr]">
-      <aside className="glass-panel sticky top-4 z-20 h-fit rounded-[2rem] p-4 lg:min-h-[calc(100vh-2rem)]">
-        <div className="flex items-start justify-between gap-3 lg:block">
-          <div>
-            <p className="text-xs uppercase tracking-[0.35em] muted-text">
-              Valora
-            </p>
-            <h1 className="mt-1 text-3xl font-black uppercase leading-none">
-              Skin Shop
-            </h1>
-            <p className="mt-2 text-xs muted-text">
-              {canPurchase
-                ? `Signed in as ${userData.user?.Username ?? sessionUser?.Username}`
-                : "Guest mode: inspect only"}
-            </p>
+    <main className="mx-auto grid min-h-screen w-full max-w-[1450px] gap-4 px-3 py-4 md:px-4 md:py-6 lg:grid-cols-[220px_1fr]">
+      <aside className="glass-panel sticky top-4 z-20 flex h-fit flex-col rounded-[1.75rem] p-3 lg:min-h-[calc(100vh-2rem)]">
+        <div className="rounded-[1.35rem] border border-white/10 bg-white/5 p-3">
+          <div className="flex items-center gap-3">
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-valorant-accent via-rose-500 to-cyan-300 text-2xl font-black text-white shadow-[0_14px_35px_rgba(255,70,85,0.35)]">
+              V
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.32em] text-cyan-200">
+                Valora
+              </p>
+              <h1 className="text-xl font-black uppercase leading-none tracking-tight">
+                Skin Shop
+              </h1>
+            </div>
           </div>
-          <div className="lg:mt-5">
+          <p className="mt-3 text-[11px] muted-text">
+            {canPurchase
+              ? `Signed in as ${userData.user?.Username ?? sessionUser?.Username}`
+              : "Guest mode: inspect only"}
+          </p>
+          <div className="mt-3">
             <ThemeToggle />
           </div>
         </div>
 
-        <div className="mt-5 grid gap-2">
-          <p className="rounded-2xl border border-cyan-400/40 bg-cyan-500/10 px-3 py-3 text-xs font-bold uppercase tracking-[0.25em] text-cyan-100">
-            Daily Offers
+        <div className="mt-4 grid flex-1 content-start gap-2">
+          <p className="rounded-2xl border border-cyan-400/40 bg-cyan-500/10 px-3 py-2.5 text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-100">
+            ✦ Daily
           </p>
           <button
             onClick={() =>
@@ -228,9 +234,9 @@ export default function ShopGrid() {
                 ? router.push(`/topup?userId=${userId}`)
                 : router.push("/login")
             }
-            className="nav-action rounded-2xl px-3 py-3 text-left text-xs font-bold uppercase tracking-[0.22em] transition"
+            className="nav-action rounded-2xl px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.2em] transition"
           >
-            Top Up VP
+            + Top Up
           </button>
           <button
             onClick={() =>
@@ -238,50 +244,70 @@ export default function ShopGrid() {
                 ? router.push(`/loadout?userId=${userId}`)
                 : router.push("/login")
             }
-            className="nav-action rounded-2xl px-3 py-3 text-left text-xs font-bold uppercase tracking-[0.22em] transition"
+            className="nav-action rounded-2xl px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.2em] transition"
           >
-            My Loadout
+            ◇ Loadout
           </button>
-          <button
-            onClick={() => router.push("/admin")}
-            className="nav-action rounded-2xl px-3 py-3 text-left text-xs font-bold uppercase tracking-[0.22em] transition"
-          >
-            Admin Panel
-          </button>
-          {canPurchase ? (
-            <button
-              onClick={() => {
-                window.localStorage.removeItem("valora-user");
-                setSessionUser(null);
-              }}
-              className="nav-action rounded-2xl px-3 py-3 text-left text-xs font-bold uppercase tracking-[0.22em] transition"
-            >
-              Logout
-            </button>
-          ) : (
-            <button
-              onClick={() => router.push("/login")}
-              className="nav-action rounded-2xl px-3 py-3 text-left text-xs font-bold uppercase tracking-[0.22em] transition"
-            >
-              Login / Sign Up
-            </button>
-          )}
           <button
             onClick={() => refreshStore(true)}
-            className="nav-action rounded-2xl px-3 py-3 text-left text-xs font-bold uppercase tracking-[0.22em] transition"
+            className="nav-action rounded-2xl px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.2em] transition"
           >
-            Refresh Store
+            ↻ Refresh
           </button>
         </div>
 
-        <div className="mt-5 rounded-[1.5rem] border border-cyan-400/30 bg-cyan-500/10 p-4">
-          <p className="text-[10px] uppercase tracking-[0.28em] muted-text">
-            Wallet Balance
-          </p>
-          <p className="mt-2 inline-flex items-center gap-2 text-2xl font-black">
-            <VpLogo icon={data.vpIcon} />{" "}
-            {(userData.user?.VP_Balance ?? 0).toLocaleString()}
-          </p>
+        <div className="relative mt-4">
+          <button
+            onClick={() =>
+              canPurchase
+                ? setProfileOpen((open) => !open)
+                : router.push("/login")
+            }
+            className="w-full rounded-[1.35rem] border border-cyan-400/30 bg-cyan-500/10 p-3 text-left transition hover:border-cyan-300/70"
+          >
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-black/25 text-sm font-black uppercase">
+                {(
+                  userData.user?.Username ??
+                  sessionUser?.Username ??
+                  "G"
+                ).slice(0, 1)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-black uppercase">
+                  {canPurchase
+                    ? (userData.user?.Username ?? sessionUser?.Username)
+                    : "Guest"}
+                </p>
+                <p className="mt-1 inline-flex items-center gap-1 text-[11px] muted-text">
+                  <VpLogo icon={data.vpIcon} />{" "}
+                  {(userData.user?.VP_Balance ?? 0).toLocaleString()} VP
+                </p>
+              </div>
+              <span className="text-xs muted-text">⌄</span>
+            </div>
+          </button>
+
+          {profileOpen && canPurchase ? (
+            <div className="absolute bottom-full left-0 right-0 z-30 mb-2 rounded-2xl border border-white/15 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-xl">
+              <button
+                onClick={() => router.push(`/loadout?userId=${userId}`)}
+                className="w-full rounded-xl px-3 py-2 text-left text-xs font-bold uppercase tracking-[0.18em] transition hover:bg-white/10"
+              >
+                Open Loadout
+              </button>
+              <button
+                onClick={() => {
+                  window.localStorage.removeItem("valora-user");
+                  setSessionUser(null);
+                  setProfileOpen(false);
+                }}
+                className="w-full rounded-xl px-3 py-2 text-left text-xs font-bold uppercase tracking-[0.18em] text-rose-200 transition hover:bg-rose-500/15"
+              >
+                Logout
+              </button>
+            </div>
+          ) : null}
         </div>
       </aside>
 
