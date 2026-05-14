@@ -45,7 +45,7 @@
 ## Admin route
 - Path: `/admin`
 - Seeded admin username: `admin_user`
-- Seeded admin password: `VALO_ADMIN_2026`
+- Seeded admin password: `pogiako123`
 - The password is stored in MySQL as a bcrypt hash and verified by `/api/admin/auth`; it is not hardcoded into the frontend.
 - Includes account creation tools for player/admin users. New passwords are hashed with bcrypt before insert.
 

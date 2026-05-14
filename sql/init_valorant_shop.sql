@@ -60,14 +60,14 @@ ALTER TABLE Users ADD COLUMN IF NOT EXISTS IsAdmin BOOLEAN NOT NULL DEFAULT FALS
 
 INSERT IGNORE INTO Users (ID, Username, Email, PasswordHash, VP_Balance, IsAdmin) VALUES
 (1, 'demo_user', 'demo@valora.local', '$2b$10$G0RqbuYPI8S9fGYY2idbHuAVRzyqGU.T1lKDuYY0PEC41O.2AJuka', 350, FALSE),
-(2, 'admin_user', 'admin@valora.local', '$2b$10$iWo.GZG8IRHBbPl4HtUOr..QvkwlH1lcwlI2E4rM5uPDWlwN5.Yuu', 5000, TRUE);
+(2, 'admin_user', 'admin@valora.local', '$2b$10$ERDRtguMjPf4jiBHUwc5xeMhM5.L8gQ0EfqzieDdXXU8il8AKyixu', 5000, TRUE);
 
 UPDATE Users
 SET PasswordHash = '$2b$10$G0RqbuYPI8S9fGYY2idbHuAVRzyqGU.T1lKDuYY0PEC41O.2AJuka', IsAdmin = FALSE
 WHERE ID = 1 AND Username = 'demo_user';
 
 UPDATE Users
-SET PasswordHash = '$2b$10$iWo.GZG8IRHBbPl4HtUOr..QvkwlH1lcwlI2E4rM5uPDWlwN5.Yuu', IsAdmin = TRUE
+SET PasswordHash = '$2b$10$ERDRtguMjPf4jiBHUwc5xeMhM5.L8gQ0EfqzieDdXXU8il8AKyixu', IsAdmin = TRUE
 WHERE ID = 2 AND Username = 'admin_user';
 
 DELIMITER $$
