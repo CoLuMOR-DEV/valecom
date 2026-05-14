@@ -6,8 +6,9 @@ CREATE TABLE IF NOT EXISTS Users (
   ID INT PRIMARY KEY AUTO_INCREMENT,
   Username VARCHAR(50) NOT NULL UNIQUE,
   Email VARCHAR(120) NULL UNIQUE,
-  PasswordHash VARCHAR(255) NOT NULL DEFAULT 'demo123',
+  PasswordHash VARCHAR(255) NOT NULL DEFAULT '$2b$10$G0RqbuYPI8S9fGYY2idbHuAVRzyqGU.T1lKDuYY0PEC41O.2AJuka',
   VP_Balance INT NOT NULL DEFAULT 0,
+  IsAdmin BOOLEAN NOT NULL DEFAULT FALSE,
   CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT chk_users_vp_non_negative CHECK (VP_Balance >= 0)
 );
@@ -55,9 +56,19 @@ CREATE TABLE IF NOT EXISTS AuditLogs (
   CONSTRAINT fk_audit_user FOREIGN KEY (UserID) REFERENCES Users(ID)
 );
 
-INSERT IGNORE INTO Users (ID, Username, Email, PasswordHash, VP_Balance) VALUES
-(1, 'demo_user', 'demo@valora.local', 'demo123', 350),
-(2, 'admin_user', 'admin@valora.local', 'admin123', 5000);
+ALTER TABLE Users ADD COLUMN IF NOT EXISTS IsAdmin BOOLEAN NOT NULL DEFAULT FALSE;
+
+INSERT IGNORE INTO Users (ID, Username, Email, PasswordHash, VP_Balance, IsAdmin) VALUES
+(1, 'demo_user', 'demo@valora.local', '$2b$10$G0RqbuYPI8S9fGYY2idbHuAVRzyqGU.T1lKDuYY0PEC41O.2AJuka', 350, FALSE),
+(2, 'admin_user', 'admin@valora.local', '$2b$10$ERDRtguMjPf4jiBHUwc5xeMhM5.L8gQ0EfqzieDdXXU8il8AKyixu', 5000, TRUE);
+
+UPDATE Users
+SET PasswordHash = '$2b$10$G0RqbuYPI8S9fGYY2idbHuAVRzyqGU.T1lKDuYY0PEC41O.2AJuka', IsAdmin = FALSE
+WHERE ID = 1 AND Username = 'demo_user';
+
+UPDATE Users
+SET PasswordHash = '$2b$10$ERDRtguMjPf4jiBHUwc5xeMhM5.L8gQ0EfqzieDdXXU8il8AKyixu', IsAdmin = TRUE
+WHERE ID = 2 AND Username = 'admin_user';
 
 DELIMITER $$
 
@@ -227,7 +238,10 @@ CREATE PROCEDURE ProcessBundlePurchase(
   IN p_skin_ids_json JSON
 )
 BEGIN
-  DECLARE current_vp INT;
+  DECLARE current_vp INT DEFAULT NULL;
+  DECLARE skin_count INT DEFAULT 0;
+  DECLARE skin_index INT DEFAULT 0;
+  DECLARE next_skin_id VARCHAR(100) DEFAULT NULL;
 
   DECLARE EXIT HANDLER FOR SQLEXCEPTION
   BEGIN
@@ -250,6 +264,12 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Bundle price should be positive';
   END IF;
 
+  SET skin_count = IFNULL(JSON_LENGTH(p_skin_ids_json), 0);
+
+  IF skin_count <= 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Bundle must include at least one skin';
+  END IF;
+
   IF current_vp < p_price_vp THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Insufficient VP balance for bundle';
   END IF;
@@ -258,10 +278,17 @@ BEGIN
   SET VP_Balance = VP_Balance - p_price_vp
   WHERE ID = p_user_id;
 
-  INSERT INTO OwnedSkins (UserID, SkinID, LevelUnlocked)
-  SELECT p_user_id, ids.skin_id, 1
-  FROM JSON_TABLE(p_skin_ids_json, '$[*]' COLUMNS (skin_id VARCHAR(100) PATH '$')) ids
-  ON DUPLICATE KEY UPDATE LevelUnlocked = GREATEST(LevelUnlocked, VALUES(LevelUnlocked));
+  WHILE skin_index < skin_count DO
+    SET next_skin_id = JSON_UNQUOTE(JSON_EXTRACT(p_skin_ids_json, CONCAT('$[', skin_index, ']')));
+
+    IF next_skin_id IS NOT NULL AND next_skin_id <> '' THEN
+      INSERT INTO OwnedSkins (UserID, SkinID, LevelUnlocked)
+      VALUES (p_user_id, next_skin_id, 1)
+      ON DUPLICATE KEY UPDATE LevelUnlocked = GREATEST(LevelUnlocked, VALUES(LevelUnlocked));
+    END IF;
+
+    SET skin_index = skin_index + 1;
+  END WHILE;
 
   INSERT INTO Transactions (UserID, SkinID, PurchasedLevel, VP_Cost, TransactionType)
   VALUES (p_user_id, CONCAT('BUNDLE:', p_bundle_id), 1, p_price_vp, 'BUNDLE');

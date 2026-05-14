@@ -19,6 +19,7 @@ type User = {
   Email?: string;
   VP_Balance: number;
   CreatedAt?: string;
+  IsAdmin?: boolean;
 };
 
 type Summary = {
@@ -49,13 +50,30 @@ export default function AdminPage() {
   const [txType, setTxType] = useState<"ALL" | "TOPUP" | "PURCHASE" | "BUNDLE">(
     "ALL",
   );
-  const [grantUserId, setGrantUserId] = useState(1);
-  const [grantAmount, setGrantAmount] = useState(1000);
-  const [isGranting, setIsGranting] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newInitialVp, setNewInitialVp] = useState(500);
+  const [newIsAdmin, setNewIsAdmin] = useState(false);
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+  const [passwordEdits, setPasswordEdits] = useState<Record<number, string>>(
+    {},
+  );
+  const [updatingPasswordId, setUpdatingPasswordId] = useState<number | null>(
+    null,
+  );
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
 
   const fetchData = useCallback(() => {
-    fetch("/api/admin/transactions")
-      .then((res) => res.json())
+    fetch("/api/admin/transactions", {
+      headers: { "x-admin-password": password },
+    })
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Failed to load admin data");
+        return json;
+      })
       .then((json) => {
         setTransactions(json.transactions ?? []);
         setUsers(json.users ?? []);
@@ -71,7 +89,7 @@ export default function AdminPage() {
         );
       })
       .catch(() => setError("Failed to load admin data"));
-  }, []);
+  }, [password]);
 
   useEffect(() => {
     if (!authed) return;
@@ -93,7 +111,10 @@ export default function AdminPage() {
     setIsResetting(true);
     setError("");
     try {
-      const res = await fetch("/api/admin/reset-test-data", { method: "POST" });
+      const res = await fetch("/api/admin/reset-test-data", {
+        method: "POST",
+        headers: { "x-admin-password": password },
+      });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Reset failed");
       fetchData();
@@ -104,22 +125,112 @@ export default function AdminPage() {
     }
   };
 
-  const handleGrant = async () => {
-    setIsGranting(true);
+  const handleAdminLogin = async () => {
+    setIsLoggingIn(true);
     setError("");
     try {
-      const res = await fetch("/api/admin/grant-vp", {
+      const res = await fetch("/api/admin/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: grantUserId, vpAmount: grantAmount }),
+        body: JSON.stringify({ password }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Grant VP failed");
+      if (!res.ok) throw new Error(json.error ?? "Admin login failed");
+      setAuthed(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Admin login failed");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleCreateAccount = async () => {
+    setIsCreatingAccount(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": password,
+        },
+        body: JSON.stringify({
+          username: newUsername,
+          email: newEmail,
+          password: newPassword,
+          initialVp: newInitialVp,
+          isAdmin: newIsAdmin,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Account creation failed");
+      setNewUsername("");
+      setNewEmail("");
+      setNewPassword("");
+      setNewInitialVp(500);
+      setNewIsAdmin(false);
       fetchData();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Grant VP failed");
+      setError(e instanceof Error ? e.message : "Account creation failed");
     } finally {
-      setIsGranting(false);
+      setIsCreatingAccount(false);
+    }
+  };
+
+  const handleChangePassword = async (userId: number) => {
+    setUpdatingPasswordId(userId);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": password,
+        },
+        body: JSON.stringify({ userId, password: passwordEdits[userId] ?? "" }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Password update failed");
+      setPasswordEdits((current) => ({ ...current, [userId]: "" }));
+      fetchData();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Password update failed");
+    } finally {
+      setUpdatingPasswordId(null);
+    }
+  };
+
+  const handleDeleteAccount = async (userId: number, username: string) => {
+    if (
+      !window.confirm(
+        `Delete ${username}? This removes the account and related shop records.`,
+      )
+    )
+      return;
+
+    setDeletingUserId(userId);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": password,
+        },
+        body: JSON.stringify({ userId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Account deletion failed");
+      setPasswordEdits((current) => {
+        const next = { ...current };
+        delete next[userId];
+        return next;
+      });
+      fetchData();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Account deletion failed");
+    } finally {
+      setDeletingUserId(null);
     }
   };
 
@@ -149,8 +260,8 @@ export default function AdminPage() {
                 Admin Panel
               </h1>
               <p className="mt-3 text-sm muted-text">
-                Enter your panel password to access transactions, player
-                balances, and test reset tools.
+                Enter the database-backed admin password to access transactions,
+                player balances, account management, and test reset tools.
               </p>
             </div>
             <ThemeToggle />
@@ -163,10 +274,10 @@ export default function AdminPage() {
             onChange={(e) => setPassword(e.target.value)}
           />
           <button
-            onClick={() => setAuthed(password === "admin123")}
+            onClick={handleAdminLogin}
             className="valorant-primary w-full rounded-2xl py-3 font-bold uppercase tracking-[0.18em]"
           >
-            Login
+            {isLoggingIn ? "Logging in..." : "Login"}
           </button>
         </section>
       </main>
@@ -251,14 +362,17 @@ export default function AdminPage() {
           Users
         </h2>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
+          <table className="w-full min-w-[1080px] text-left text-sm">
             <thead className="bg-white/5 muted-text">
               <tr>
                 <th className="p-3">ID</th>
                 <th className="p-3">Username</th>
                 <th className="p-3">Email</th>
                 <th className="p-3">Current VP</th>
+                <th className="p-3">Role</th>
                 <th className="p-3">Joined</th>
+                <th className="p-3">Password</th>
+                <th className="p-3">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -268,10 +382,53 @@ export default function AdminPage() {
                   <td className="p-3 font-bold">{user.Username}</td>
                   <td className="p-3 muted-text">{user.Email || "-"}</td>
                   <td className="p-3">{user.VP_Balance}</td>
+                  <td className="p-3">
+                    <span
+                      className={`rounded-full px-2 py-1 text-xs ${user.IsAdmin ? "bg-amber-400/15 text-amber-200" : "bg-cyan-400/15 text-cyan-200"}`}
+                    >
+                      {user.IsAdmin ? "ADMIN" : "PLAYER"}
+                    </span>
+                  </td>
                   <td className="p-3 muted-text">
                     {user.CreatedAt
                       ? new Date(user.CreatedAt).toLocaleDateString()
                       : "-"}
+                  </td>
+                  <td className="p-3">
+                    <input
+                      value={passwordEdits[user.ID] ?? ""}
+                      onChange={(e) =>
+                        setPasswordEdits((current) => ({
+                          ...current,
+                          [user.ID]: e.target.value,
+                        }))
+                      }
+                      className="glass-field w-44 rounded-2xl p-2 text-xs"
+                      placeholder="New password"
+                      type="password"
+                    />
+                  </td>
+                  <td className="p-3">
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => handleChangePassword(user.ID)}
+                        disabled={updatingPasswordId === user.ID}
+                        className="rounded-2xl bg-cyan-300 px-3 py-2 text-xs font-bold uppercase text-black disabled:opacity-60"
+                      >
+                        {updatingPasswordId === user.ID
+                          ? "Saving..."
+                          : "Change"}
+                      </button>
+                      <button
+                        onClick={() =>
+                          handleDeleteAccount(user.ID, user.Username)
+                        }
+                        disabled={deletingUserId === user.ID}
+                        className="rounded-2xl bg-rose-500 px-3 py-2 text-xs font-bold uppercase text-white disabled:opacity-60"
+                      >
+                        {deletingUserId === user.ID ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -281,37 +438,61 @@ export default function AdminPage() {
       </section>
 
       <section className="glass-panel mb-6 rounded-[2rem] p-4">
-        <h2 className="mb-3 text-lg font-black uppercase">Admin Tools</h2>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_160px_160px_1fr]">
-          <select
-            value={grantUserId}
-            onChange={(e) => setGrantUserId(Number(e.target.value))}
+        <div className="mb-4">
+          <p className="text-xs uppercase tracking-[0.25em] text-cyan-200">
+            Account Management
+          </p>
+          <h2 className="text-lg font-black uppercase">Account Management</h2>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_160px_140px_120px]">
+          <input
+            value={newUsername}
+            onChange={(e) => setNewUsername(e.target.value)}
             className="glass-field rounded-2xl p-2"
-          >
-            {users.map((u) => (
-              <option key={u.ID} value={u.ID}>
-                {u.Username} (ID {u.ID})
-              </option>
-            ))}
-          </select>
+            placeholder="Username"
+          />
+          <input
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            className="glass-field rounded-2xl p-2"
+            placeholder="Email (optional)"
+            type="email"
+          />
+          <input
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            className="glass-field rounded-2xl p-2"
+            placeholder="Password"
+            type="password"
+          />
           <input
             type="number"
-            min={100}
+            min={0}
             step={100}
-            value={grantAmount}
-            onChange={(e) => setGrantAmount(Number(e.target.value))}
+            value={newInitialVp}
+            onChange={(e) => setNewInitialVp(Number(e.target.value))}
             className="glass-field rounded-2xl p-2"
+            aria-label="Initial VP balance"
           />
+          <label className="flex items-center gap-2 rounded-2xl border border-white/10 px-3 py-2 text-xs muted-text">
+            <input
+              checked={newIsAdmin}
+              onChange={(e) => setNewIsAdmin(e.target.checked)}
+              type="checkbox"
+            />
+            Admin
+          </label>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
-            onClick={handleGrant}
-            disabled={isGranting}
-            className="rounded-2xl bg-emerald-400 px-4 py-2 font-bold uppercase text-black disabled:opacity-60"
+            onClick={handleCreateAccount}
+            disabled={isCreatingAccount}
+            className="rounded-2xl bg-cyan-300 px-4 py-2 text-sm font-bold uppercase text-black disabled:opacity-60"
           >
-            {isGranting ? "Granting..." : "Grant VP"}
+            {isCreatingAccount ? "Creating..." : "Create Account"}
           </button>
-          <p className="text-xs muted-text">
-            Adds VP to user balance and records a TOPUP transaction.
-          </p>
         </div>
       </section>
 

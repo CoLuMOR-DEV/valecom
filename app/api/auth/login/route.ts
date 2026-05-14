@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import pool from '@/lib/db';
+import { findUserByUsername, verifyPassword } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,17 +8,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'username and password are required' }, { status: 400 });
     }
 
-    const [rows] = await pool.query(
-      'SELECT ID, Username, VP_Balance, PasswordHash FROM Users WHERE Username = ? LIMIT 1',
-      [String(username).trim()]
-    );
-
-    const user = (rows as Array<{ ID: number; Username: string; VP_Balance: number; PasswordHash: string }>)[0];
-    if (!user || user.PasswordHash !== String(password)) {
+    const user = await findUserByUsername(String(username).trim());
+    if (!user || !(await verifyPassword(String(password), user.PasswordHash))) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    return NextResponse.json({ ok: true, user: { ID: user.ID, Username: user.Username, VP_Balance: user.VP_Balance } });
+    return NextResponse.json({
+      ok: true,
+      user: { ID: user.ID, Username: user.Username, VP_Balance: user.VP_Balance, IsAdmin: Boolean(user.IsAdmin) },
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Login failed';
     return NextResponse.json({ error: message }, { status: 500 });

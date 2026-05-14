@@ -11,8 +11,9 @@ erDiagram
       int ID PK
       varchar Username UK
       varchar Email UK
-      varchar PasswordHash
+      varchar PasswordHash "bcrypt hash"
       int VP_Balance "CHECK >= 0"
+      boolean IsAdmin
       timestamp CreatedAt
     }
 
@@ -78,3 +79,8 @@ erDiagram
 - `trg_loadout_before_update` (BEFORE UPDATE on `LoadoutSelections`)
 - `trg_loadout_audit_insert` (AFTER INSERT on `LoadoutSelections`)
 - `trg_loadout_audit_update` (AFTER UPDATE on `LoadoutSelections`)
+
+### Authentication and Account Management
+- `PasswordHash` stores bcrypt hashes only; plaintext passwords are not stored.
+- `IsAdmin` marks admin-capable accounts, including the seeded `admin_user`.
+- Admin account creation, password changes, and account deletion are handled through `/api/admin/users` after server-side bcrypt admin authentication.

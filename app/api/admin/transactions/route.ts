@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { requireAdminPassword } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const admin = await requireAdminPassword(request.headers.get('x-admin-password') ?? '');
+    if (!admin) {
+      return NextResponse.json({ error: 'Unauthorized admin request' }, { status: 401 });
+    }
+
     const [rows] = await pool.query(
       `SELECT TransactionID, UserID, SkinID, PurchasedLevel, VP_Cost, TransactionType, CreatedAt
        FROM Transactions
@@ -21,7 +27,7 @@ export async function GET() {
        FROM Transactions`
     );
 
-    const [userRows] = await pool.query('SELECT ID, Username, Email, VP_Balance, CreatedAt FROM Users ORDER BY ID ASC');
+    const [userRows] = await pool.query('SELECT ID, Username, Email, VP_Balance, IsAdmin, CreatedAt FROM Users ORDER BY ID ASC');
 
     return NextResponse.json({
       transactions: rows,

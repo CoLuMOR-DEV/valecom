@@ -53,7 +53,7 @@ export default function LoginPage() {
             </p>
             <h1 className="mb-1 text-3xl font-black uppercase">Account</h1>
             <p className="text-sm muted-text">
-              Sign in or create an account to continue shopping.
+              Sign in or create an account to continue shopping. New passwords need at least 8 characters.
             </p>
           </div>
           <ThemeToggle />
