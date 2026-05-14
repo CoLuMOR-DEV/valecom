@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { requireAdminPassword } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
+    const admin = await requireAdminPassword(request.headers.get('x-admin-password') ?? '');
+    if (!admin) {
+      return NextResponse.json({ error: 'Unauthorized admin request' }, { status: 401 });
+    }
+
     const { userId, vpAmount } = await request.json();
     if (!userId || !vpAmount || Number(vpAmount) <= 0) {
       return NextResponse.json({ error: 'userId and positive vpAmount required' }, { status: 400 });

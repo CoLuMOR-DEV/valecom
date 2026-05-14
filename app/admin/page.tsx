@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
 
-const ADMIN_PASSWORD = "VALO_ADMIN_2026";
-
 type Tx = {
   TransactionID: number;
   UserID: number;
@@ -21,6 +19,7 @@ type User = {
   Email?: string;
   VP_Balance: number;
   CreatedAt?: string;
+  IsAdmin?: boolean;
 };
 
 type Summary = {
@@ -30,15 +29,6 @@ type Summary = {
   totalVPPurchases: number;
   activeUsers: number;
   lastPurchaseAt: string | null;
-};
-
-type DclPresetKey = "readonly" | "app_runtime" | "admin_ops";
-
-type DclInfo = {
-  currentUser: string | null;
-  databaseName: string | null;
-  grants: string[];
-  presets: Record<DclPresetKey, { label: string; privileges: string[]; scope: string }>;
 };
 
 export default function AdminPage() {
@@ -63,28 +53,21 @@ export default function AdminPage() {
   const [grantUserId, setGrantUserId] = useState(1);
   const [grantAmount, setGrantAmount] = useState(1000);
   const [isGranting, setIsGranting] = useState(false);
-  const [dclInfo, setDclInfo] = useState<DclInfo | null>(null);
-  const [dclUser, setDclUser] = useState("valora_runtime");
-  const [dclHost, setDclHost] = useState("%");
-  const [dclPassword, setDclPassword] = useState("");
-  const [dclPreset, setDclPreset] = useState<DclPresetKey>("app_runtime");
-  const [dclCreateUser, setDclCreateUser] = useState(true);
-  const [isDclApplying, setIsDclApplying] = useState(false);
-  const [dclResult, setDclResult] = useState<string[]>([]);
-
-  const fetchDclInfo = useCallback(() => {
-    fetch("/api/admin/dcl", { headers: { "x-admin-password": password } })
-      .then((res) => res.json())
-      .then((json) => {
-        if (json.presets) setDclInfo(json);
-        if (!json.presets && json.error) setError(json.error);
-      })
-      .catch(() => setError("Failed to load DCL data"));
-  }, [password]);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newInitialVp, setNewInitialVp] = useState(500);
+  const [newIsAdmin, setNewIsAdmin] = useState(false);
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
   const fetchData = useCallback(() => {
-    fetch("/api/admin/transactions")
-      .then((res) => res.json())
+    fetch("/api/admin/transactions", { headers: { "x-admin-password": password } })
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Failed to load admin data");
+        return json;
+      })
       .then((json) => {
         setTransactions(json.transactions ?? []);
         setUsers(json.users ?? []);
@@ -100,8 +83,7 @@ export default function AdminPage() {
         );
       })
       .catch(() => setError("Failed to load admin data"));
-    fetchDclInfo();
-  }, [fetchDclInfo]);
+  }, [password]);
 
   useEffect(() => {
     if (!authed) return;
@@ -123,7 +105,7 @@ export default function AdminPage() {
     setIsResetting(true);
     setError("");
     try {
-      const res = await fetch("/api/admin/reset-test-data", { method: "POST" });
+      const res = await fetch("/api/admin/reset-test-data", { method: "POST", headers: { "x-admin-password": password } });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Reset failed");
       fetchData();
@@ -134,31 +116,22 @@ export default function AdminPage() {
     }
   };
 
-  const handleApplyDcl = async (action: "grant" | "revoke") => {
-    setIsDclApplying(true);
+  const handleAdminLogin = async () => {
+    setIsLoggingIn(true);
     setError("");
-    setDclResult([]);
     try {
-      const res = await fetch("/api/admin/dcl", {
+      const res = await fetch("/api/admin/auth", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-password": password },
-        body: JSON.stringify({
-          action,
-          preset: dclPreset,
-          user: dclUser,
-          host: dclHost,
-          createUser: action === "grant" && dclCreateUser,
-          password: dclPassword,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "DCL operation failed");
-      setDclResult(json.executed ?? []);
-      fetchDclInfo();
+      if (!res.ok) throw new Error(json.error ?? "Admin login failed");
+      setAuthed(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "DCL operation failed");
+      setError(e instanceof Error ? e.message : "Admin login failed");
     } finally {
-      setIsDclApplying(false);
+      setIsLoggingIn(false);
     }
   };
 
@@ -168,7 +141,7 @@ export default function AdminPage() {
     try {
       const res = await fetch("/api/admin/grant-vp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-admin-password": password },
         body: JSON.stringify({ userId: grantUserId, vpAmount: grantAmount }),
       });
       const json = await res.json();
@@ -178,6 +151,36 @@ export default function AdminPage() {
       setError(e instanceof Error ? e.message : "Grant VP failed");
     } finally {
       setIsGranting(false);
+    }
+  };
+
+  const handleCreateAccount = async () => {
+    setIsCreatingAccount(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-password": password },
+        body: JSON.stringify({
+          username: newUsername,
+          email: newEmail,
+          password: newPassword,
+          initialVp: newInitialVp,
+          isAdmin: newIsAdmin,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Account creation failed");
+      setNewUsername("");
+      setNewEmail("");
+      setNewPassword("");
+      setNewInitialVp(500);
+      setNewIsAdmin(false);
+      fetchData();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Account creation failed");
+    } finally {
+      setIsCreatingAccount(false);
     }
   };
 
@@ -207,8 +210,8 @@ export default function AdminPage() {
                 Admin Panel
               </h1>
               <p className="mt-3 text-sm muted-text">
-                Enter your panel password to access transactions, player
-                balances, and test reset tools.
+                Enter the database-backed admin password to access transactions,
+                player balances, account creation, and test reset tools.
               </p>
             </div>
             <ThemeToggle />
@@ -221,10 +224,10 @@ export default function AdminPage() {
             onChange={(e) => setPassword(e.target.value)}
           />
           <button
-            onClick={() => setAuthed(password === ADMIN_PASSWORD)}
+            onClick={handleAdminLogin}
             className="valorant-primary w-full rounded-2xl py-3 font-bold uppercase tracking-[0.18em]"
           >
-            Login
+            {isLoggingIn ? "Logging in..." : "Login"}
           </button>
         </section>
       </main>
@@ -316,6 +319,7 @@ export default function AdminPage() {
                 <th className="p-3">Username</th>
                 <th className="p-3">Email</th>
                 <th className="p-3">Current VP</th>
+                <th className="p-3">Role</th>
                 <th className="p-3">Joined</th>
               </tr>
             </thead>
@@ -326,6 +330,11 @@ export default function AdminPage() {
                   <td className="p-3 font-bold">{user.Username}</td>
                   <td className="p-3 muted-text">{user.Email || "-"}</td>
                   <td className="p-3">{user.VP_Balance}</td>
+                  <td className="p-3">
+                    <span className={`rounded-full px-2 py-1 text-xs ${user.IsAdmin ? "bg-amber-400/15 text-amber-200" : "bg-cyan-400/15 text-cyan-200"}`}>
+                      {user.IsAdmin ? "ADMIN" : "PLAYER"}
+                    </span>
+                  </td>
                   <td className="p-3 muted-text">
                     {user.CreatedAt
                       ? new Date(user.CreatedAt).toLocaleDateString()
@@ -373,132 +382,70 @@ export default function AdminPage() {
         </div>
       </section>
 
-
       <section className="glass-panel mb-6 rounded-[2rem] p-4">
-        <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.25em] text-cyan-200">
-              Data Control Language
-            </p>
-            <h2 className="text-lg font-black uppercase">Database Access Control</h2>
-            <p className="mt-1 max-w-3xl text-xs muted-text">
-              Safely apply preset MySQL GRANT/REVOKE permissions from the Admin Panel.
-              Avoids free-form SQL while still supporting DCL for app runtime,
-              reporting, and admin operation accounts.
-            </p>
-          </div>
-          <button
-            onClick={fetchDclInfo}
-            className="nav-action rounded-2xl px-4 py-2 text-xs font-bold uppercase tracking-wider"
-          >
-            Refresh DCL
-          </button>
+        <div className="mb-4">
+          <p className="text-xs uppercase tracking-[0.25em] text-cyan-200">
+            Account Management
+          </p>
+          <h2 className="text-lg font-black uppercase">Create User Accounts</h2>
+          <p className="mt-1 max-w-3xl text-xs muted-text">
+            Create player or admin accounts directly from the Admin Panel. Passwords are
+            hashed with bcrypt before they are stored in MySQL, so plaintext passwords
+            are never saved in the database or hardcoded into the frontend.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-          <div className="glass-card rounded-[1.5rem] p-4">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <label className="text-xs font-bold uppercase muted-text">
-                DB User
-                <input
-                  value={dclUser}
-                  onChange={(e) => setDclUser(e.target.value)}
-                  className="glass-field mt-1 w-full rounded-2xl p-2 text-sm normal-case"
-                  placeholder="valora_runtime"
-                />
-              </label>
-              <label className="text-xs font-bold uppercase muted-text">
-                Host
-                <input
-                  value={dclHost}
-                  onChange={(e) => setDclHost(e.target.value)}
-                  className="glass-field mt-1 w-full rounded-2xl p-2 text-sm normal-case"
-                  placeholder="%"
-                />
-              </label>
-              <label className="text-xs font-bold uppercase muted-text">
-                Permission preset
-                <select
-                  value={dclPreset}
-                  onChange={(e) => setDclPreset(e.target.value as DclPresetKey)}
-                  className="glass-field mt-1 w-full rounded-2xl p-2 text-sm normal-case"
-                >
-                  {dclInfo
-                    ? (Object.entries(dclInfo.presets) as Array<[
-                        DclPresetKey,
-                        DclInfo["presets"][DclPresetKey],
-                      ]>).map(([key, preset]) => (
-                        <option key={key} value={key}>
-                          {preset.label} ({preset.privileges.join(", ")})
-                        </option>
-                      ))
-                    : null}
-                </select>
-              </label>
-              <label className="text-xs font-bold uppercase muted-text">
-                New user password
-                <input
-                  value={dclPassword}
-                  onChange={(e) => setDclPassword(e.target.value)}
-                  className="glass-field mt-1 w-full rounded-2xl p-2 text-sm normal-case"
-                  placeholder="Required only when creating user"
-                  type="password"
-                />
-              </label>
-            </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_160px_140px_120px]">
+          <input
+            value={newUsername}
+            onChange={(e) => setNewUsername(e.target.value)}
+            className="glass-field rounded-2xl p-2"
+            placeholder="Username"
+          />
+          <input
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            className="glass-field rounded-2xl p-2"
+            placeholder="Email (optional)"
+            type="email"
+          />
+          <input
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            className="glass-field rounded-2xl p-2"
+            placeholder="Password"
+            type="password"
+          />
+          <input
+            type="number"
+            min={0}
+            step={100}
+            value={newInitialVp}
+            onChange={(e) => setNewInitialVp(Number(e.target.value))}
+            className="glass-field rounded-2xl p-2"
+            aria-label="Initial VP balance"
+          />
+          <label className="flex items-center gap-2 rounded-2xl border border-white/10 px-3 py-2 text-xs muted-text">
+            <input
+              checked={newIsAdmin}
+              onChange={(e) => setNewIsAdmin(e.target.checked)}
+              type="checkbox"
+            />
+            Admin
+          </label>
+        </div>
 
-            <label className="mt-3 flex items-center gap-2 text-xs muted-text">
-              <input
-                checked={dclCreateUser}
-                onChange={(e) => setDclCreateUser(e.target.checked)}
-                type="checkbox"
-              />
-              Create the database account if it does not already exist before granting.
-            </label>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                onClick={() => handleApplyDcl("grant")}
-                disabled={isDclApplying}
-                className="rounded-2xl bg-cyan-300 px-4 py-2 text-sm font-bold uppercase text-black disabled:opacity-60"
-              >
-                {isDclApplying ? "Applying..." : "Grant Preset"}
-              </button>
-              <button
-                onClick={() => handleApplyDcl("revoke")}
-                disabled={isDclApplying}
-                className="rounded-2xl bg-rose-400 px-4 py-2 text-sm font-bold uppercase text-black disabled:opacity-60"
-              >
-                Revoke Preset
-              </button>
-            </div>
-
-            {dclResult.length ? (
-              <div className="mt-4 rounded-2xl border border-emerald-300/30 bg-emerald-400/10 p-3 text-xs text-emerald-100">
-                <p className="mb-2 font-bold uppercase">Executed DCL</p>
-                <ul className="list-disc space-y-1 pl-4">
-                  {dclResult.map((statement) => (
-                    <li key={statement}>{statement}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="glass-card rounded-[1.5rem] p-4">
-            <p className="text-xs uppercase muted-text">Connected as</p>
-            <p className="break-all font-bold">{dclInfo?.currentUser ?? "Unknown"}</p>
-            <p className="mt-3 text-xs uppercase muted-text">Database</p>
-            <p className="font-bold">{dclInfo?.databaseName ?? "Unknown"}</p>
-            <p className="mt-3 text-xs uppercase muted-text">Current grants</p>
-            <div className="mt-2 max-h-44 space-y-2 overflow-auto rounded-2xl bg-black/20 p-3 text-xs muted-text">
-              {dclInfo?.grants?.length ? (
-                dclInfo.grants.map((grant) => <p key={grant}>{grant}</p>)
-              ) : (
-                <p>No grants available or current DB user cannot inspect grants.</p>
-              )}
-            </div>
-          </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            onClick={handleCreateAccount}
+            disabled={isCreatingAccount}
+            className="rounded-2xl bg-cyan-300 px-4 py-2 text-sm font-bold uppercase text-black disabled:opacity-60"
+          >
+            {isCreatingAccount ? "Creating..." : "Create Account"}
+          </button>
+          <p className="text-xs muted-text">
+            New accounts require at least 8 characters in the password and are stored as bcrypt hashes.
+          </p>
         </div>
       </section>
 

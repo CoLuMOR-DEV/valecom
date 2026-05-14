@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "framer-motion": "^11.11.9",
     "mysql2": "^3.11.3",
     "next": "14.2.15",
@@ -16,6 +17,7 @@
     "react-dom": "18.3.1"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/node": "^22.8.1",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.0",

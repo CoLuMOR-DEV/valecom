@@ -6,8 +6,9 @@ CREATE TABLE IF NOT EXISTS Users (
   ID INT PRIMARY KEY AUTO_INCREMENT,
   Username VARCHAR(50) NOT NULL UNIQUE,
   Email VARCHAR(120) NULL UNIQUE,
-  PasswordHash VARCHAR(255) NOT NULL DEFAULT 'demo123',
+  PasswordHash VARCHAR(255) NOT NULL DEFAULT '$2b$10$G0RqbuYPI8S9fGYY2idbHuAVRzyqGU.T1lKDuYY0PEC41O.2AJuka',
   VP_Balance INT NOT NULL DEFAULT 0,
+  IsAdmin BOOLEAN NOT NULL DEFAULT FALSE,
   CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT chk_users_vp_non_negative CHECK (VP_Balance >= 0)
 );
@@ -55,9 +56,19 @@ CREATE TABLE IF NOT EXISTS AuditLogs (
   CONSTRAINT fk_audit_user FOREIGN KEY (UserID) REFERENCES Users(ID)
 );
 
-INSERT IGNORE INTO Users (ID, Username, Email, PasswordHash, VP_Balance) VALUES
-(1, 'demo_user', 'demo@valora.local', 'demo123', 350),
-(2, 'admin_user', 'admin@valora.local', 'admin123', 5000);
+ALTER TABLE Users ADD COLUMN IF NOT EXISTS IsAdmin BOOLEAN NOT NULL DEFAULT FALSE;
+
+INSERT IGNORE INTO Users (ID, Username, Email, PasswordHash, VP_Balance, IsAdmin) VALUES
+(1, 'demo_user', 'demo@valora.local', '$2b$10$G0RqbuYPI8S9fGYY2idbHuAVRzyqGU.T1lKDuYY0PEC41O.2AJuka', 350, FALSE),
+(2, 'admin_user', 'admin@valora.local', '$2b$10$iWo.GZG8IRHBbPl4HtUOr..QvkwlH1lcwlI2E4rM5uPDWlwN5.Yuu', 5000, TRUE);
+
+UPDATE Users
+SET PasswordHash = '$2b$10$G0RqbuYPI8S9fGYY2idbHuAVRzyqGU.T1lKDuYY0PEC41O.2AJuka', IsAdmin = FALSE
+WHERE ID = 1 AND Username = 'demo_user';
+
+UPDATE Users
+SET PasswordHash = '$2b$10$iWo.GZG8IRHBbPl4HtUOr..QvkwlH1lcwlI2E4rM5uPDWlwN5.Yuu', IsAdmin = TRUE
+WHERE ID = 2 AND Username = 'admin_user';
 
 DELIMITER $$
 

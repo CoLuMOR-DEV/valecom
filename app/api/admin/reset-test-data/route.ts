@@ -1,7 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { requireAdminPassword } from '@/lib/auth';
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const admin = await requireAdminPassword(request.headers.get('x-admin-password') ?? '');
+  if (!admin) {
+    return NextResponse.json({ error: 'Unauthorized admin request' }, { status: 401 });
+  }
+
   let connection;
   try {
     connection = await pool.getConnection();
