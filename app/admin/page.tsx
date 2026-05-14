@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
 
+const ADMIN_PASSWORD = "VALO_ADMIN_2026";
+
 type Tx = {
   TransactionID: number;
   UserID: number;
@@ -30,6 +32,15 @@ type Summary = {
   lastPurchaseAt: string | null;
 };
 
+type DclPresetKey = "readonly" | "app_runtime" | "admin_ops";
+
+type DclInfo = {
+  currentUser: string | null;
+  databaseName: string | null;
+  grants: string[];
+  presets: Record<DclPresetKey, { label: string; privileges: string[]; scope: string }>;
+};
+
 export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [authed, setAuthed] = useState(false);
@@ -52,6 +63,24 @@ export default function AdminPage() {
   const [grantUserId, setGrantUserId] = useState(1);
   const [grantAmount, setGrantAmount] = useState(1000);
   const [isGranting, setIsGranting] = useState(false);
+  const [dclInfo, setDclInfo] = useState<DclInfo | null>(null);
+  const [dclUser, setDclUser] = useState("valora_runtime");
+  const [dclHost, setDclHost] = useState("%");
+  const [dclPassword, setDclPassword] = useState("");
+  const [dclPreset, setDclPreset] = useState<DclPresetKey>("app_runtime");
+  const [dclCreateUser, setDclCreateUser] = useState(true);
+  const [isDclApplying, setIsDclApplying] = useState(false);
+  const [dclResult, setDclResult] = useState<string[]>([]);
+
+  const fetchDclInfo = useCallback(() => {
+    fetch("/api/admin/dcl", { headers: { "x-admin-password": password } })
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.presets) setDclInfo(json);
+        if (!json.presets && json.error) setError(json.error);
+      })
+      .catch(() => setError("Failed to load DCL data"));
+  }, [password]);
 
   const fetchData = useCallback(() => {
     fetch("/api/admin/transactions")
@@ -71,7 +100,8 @@ export default function AdminPage() {
         );
       })
       .catch(() => setError("Failed to load admin data"));
-  }, []);
+    fetchDclInfo();
+  }, [fetchDclInfo]);
 
   useEffect(() => {
     if (!authed) return;
@@ -101,6 +131,34 @@ export default function AdminPage() {
       setError(e instanceof Error ? e.message : "Reset failed");
     } finally {
       setIsResetting(false);
+    }
+  };
+
+  const handleApplyDcl = async (action: "grant" | "revoke") => {
+    setIsDclApplying(true);
+    setError("");
+    setDclResult([]);
+    try {
+      const res = await fetch("/api/admin/dcl", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-password": password },
+        body: JSON.stringify({
+          action,
+          preset: dclPreset,
+          user: dclUser,
+          host: dclHost,
+          createUser: action === "grant" && dclCreateUser,
+          password: dclPassword,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "DCL operation failed");
+      setDclResult(json.executed ?? []);
+      fetchDclInfo();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "DCL operation failed");
+    } finally {
+      setIsDclApplying(false);
     }
   };
 
@@ -163,7 +221,7 @@ export default function AdminPage() {
             onChange={(e) => setPassword(e.target.value)}
           />
           <button
-            onClick={() => setAuthed(password === "admin123")}
+            onClick={() => setAuthed(password === ADMIN_PASSWORD)}
             className="valorant-primary w-full rounded-2xl py-3 font-bold uppercase tracking-[0.18em]"
           >
             Login
@@ -312,6 +370,135 @@ export default function AdminPage() {
           <p className="text-xs muted-text">
             Adds VP to user balance and records a TOPUP transaction.
           </p>
+        </div>
+      </section>
+
+
+      <section className="glass-panel mb-6 rounded-[2rem] p-4">
+        <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.25em] text-cyan-200">
+              Data Control Language
+            </p>
+            <h2 className="text-lg font-black uppercase">Database Access Control</h2>
+            <p className="mt-1 max-w-3xl text-xs muted-text">
+              Safely apply preset MySQL GRANT/REVOKE permissions from the Admin Panel.
+              Avoids free-form SQL while still supporting DCL for app runtime,
+              reporting, and admin operation accounts.
+            </p>
+          </div>
+          <button
+            onClick={fetchDclInfo}
+            className="nav-action rounded-2xl px-4 py-2 text-xs font-bold uppercase tracking-wider"
+          >
+            Refresh DCL
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+          <div className="glass-card rounded-[1.5rem] p-4">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <label className="text-xs font-bold uppercase muted-text">
+                DB User
+                <input
+                  value={dclUser}
+                  onChange={(e) => setDclUser(e.target.value)}
+                  className="glass-field mt-1 w-full rounded-2xl p-2 text-sm normal-case"
+                  placeholder="valora_runtime"
+                />
+              </label>
+              <label className="text-xs font-bold uppercase muted-text">
+                Host
+                <input
+                  value={dclHost}
+                  onChange={(e) => setDclHost(e.target.value)}
+                  className="glass-field mt-1 w-full rounded-2xl p-2 text-sm normal-case"
+                  placeholder="%"
+                />
+              </label>
+              <label className="text-xs font-bold uppercase muted-text">
+                Permission preset
+                <select
+                  value={dclPreset}
+                  onChange={(e) => setDclPreset(e.target.value as DclPresetKey)}
+                  className="glass-field mt-1 w-full rounded-2xl p-2 text-sm normal-case"
+                >
+                  {dclInfo
+                    ? (Object.entries(dclInfo.presets) as Array<[
+                        DclPresetKey,
+                        DclInfo["presets"][DclPresetKey],
+                      ]>).map(([key, preset]) => (
+                        <option key={key} value={key}>
+                          {preset.label} ({preset.privileges.join(", ")})
+                        </option>
+                      ))
+                    : null}
+                </select>
+              </label>
+              <label className="text-xs font-bold uppercase muted-text">
+                New user password
+                <input
+                  value={dclPassword}
+                  onChange={(e) => setDclPassword(e.target.value)}
+                  className="glass-field mt-1 w-full rounded-2xl p-2 text-sm normal-case"
+                  placeholder="Required only when creating user"
+                  type="password"
+                />
+              </label>
+            </div>
+
+            <label className="mt-3 flex items-center gap-2 text-xs muted-text">
+              <input
+                checked={dclCreateUser}
+                onChange={(e) => setDclCreateUser(e.target.checked)}
+                type="checkbox"
+              />
+              Create the database account if it does not already exist before granting.
+            </label>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                onClick={() => handleApplyDcl("grant")}
+                disabled={isDclApplying}
+                className="rounded-2xl bg-cyan-300 px-4 py-2 text-sm font-bold uppercase text-black disabled:opacity-60"
+              >
+                {isDclApplying ? "Applying..." : "Grant Preset"}
+              </button>
+              <button
+                onClick={() => handleApplyDcl("revoke")}
+                disabled={isDclApplying}
+                className="rounded-2xl bg-rose-400 px-4 py-2 text-sm font-bold uppercase text-black disabled:opacity-60"
+              >
+                Revoke Preset
+              </button>
+            </div>
+
+            {dclResult.length ? (
+              <div className="mt-4 rounded-2xl border border-emerald-300/30 bg-emerald-400/10 p-3 text-xs text-emerald-100">
+                <p className="mb-2 font-bold uppercase">Executed DCL</p>
+                <ul className="list-disc space-y-1 pl-4">
+                  {dclResult.map((statement) => (
+                    <li key={statement}>{statement}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="glass-card rounded-[1.5rem] p-4">
+            <p className="text-xs uppercase muted-text">Connected as</p>
+            <p className="break-all font-bold">{dclInfo?.currentUser ?? "Unknown"}</p>
+            <p className="mt-3 text-xs uppercase muted-text">Database</p>
+            <p className="font-bold">{dclInfo?.databaseName ?? "Unknown"}</p>
+            <p className="mt-3 text-xs uppercase muted-text">Current grants</p>
+            <div className="mt-2 max-h-44 space-y-2 overflow-auto rounded-2xl bg-black/20 p-3 text-xs muted-text">
+              {dclInfo?.grants?.length ? (
+                dclInfo.grants.map((grant) => <p key={grant}>{grant}</p>)
+              ) : (
+                <p>No grants available or current DB user cannot inspect grants.</p>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 

@@ -4,6 +4,7 @@
 - Real DB-backed purchase persistence end-to-end on localhost (XAMPP MySQL).
 - ACID-focused stored procedures for top-ups, single-skin purchases, bundle purchases, and loadout saves.
 - Trigger-based auditing for transactions and loadout equip/switch actions.
+- Controlled Data Control Language (DCL) presets for least-privilege MySQL access.
 - UI reads live user VP/owned skin/loadout state from DB with localStorage fallback.
 
 ## Architecture
@@ -37,12 +38,21 @@
 - `GET /api/loadout?userId=1` → fetch persisted loadout selections.
 - `POST /api/loadout` → persist loadout selections via `SaveLoadoutSelection`.
 - `GET /api/admin/transactions` → admin table rows.
+- `GET /api/admin/dcl` → current MySQL user, active grants, and supported DCL presets.
+- `POST /api/admin/dcl` → controlled `GRANT`/`REVOKE` preset operations for DB accounts.
 
 ## Admin route
 - Path: `/admin`
 - Password: `VALO_ADMIN_2026`
+- Includes a Data Control Language panel for preset MySQL `GRANT`/`REVOKE` workflows. The connected DB account must already have the required MySQL administrative privileges for DCL operations to succeed.
 
 ## Production MySQL strategy for Vercel
 - PlanetScale or Aiven can be used by setting:
   `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE`.
 - Keep API code unchanged; only env vars differ by environment.
+
+
+## Data Control Language strategy
+- `sql/dcl_access_control.sql` includes optional MySQL roles for read-only reporting, app runtime access, and admin operations.
+- The Admin Panel exposes those same presets through `/api/admin/dcl` so maintainers can grant or revoke access without running arbitrary SQL in the browser.
+- Use environment-specific database users in production and avoid reusing the demo `valora_runtime` password outside local development.

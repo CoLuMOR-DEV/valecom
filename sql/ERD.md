@@ -78,3 +78,9 @@ erDiagram
 - `trg_loadout_before_update` (BEFORE UPDATE on `LoadoutSelections`)
 - `trg_loadout_audit_insert` (AFTER INSERT on `LoadoutSelections`)
 - `trg_loadout_audit_update` (AFTER UPDATE on `LoadoutSelections`)
+
+### Data Control Language
+- `valorant_shop_readonly` role: `SELECT` access for reporting users.
+- `valorant_shop_app_runtime` role: `SELECT`, `INSERT`, `UPDATE`, and `EXECUTE` for the application runtime user.
+- `valorant_shop_admin_ops` role: `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `EXECUTE`, and `SHOW VIEW` for controlled admin operations.
+- `/api/admin/dcl` exposes preset `GRANT`/`REVOKE` workflows for these access patterns without allowing arbitrary SQL.
