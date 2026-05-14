@@ -83,4 +83,4 @@ erDiagram
 ### Authentication and Account Management
 - `PasswordHash` stores bcrypt hashes only; plaintext passwords are not stored.
 - `IsAdmin` marks admin-capable accounts, including the seeded `admin_user`.
-- Admin account creation is handled through `/api/admin/users` after server-side bcrypt admin authentication.
+- Admin account creation, password changes, and account deletion are handled through `/api/admin/users` after server-side bcrypt admin authentication.
