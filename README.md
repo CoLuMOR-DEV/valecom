@@ -53,6 +53,7 @@
 - PlanetScale or Aiven can be used by setting:
   `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE`.
 - Keep API code unchanged; only env vars differ by environment.
+- Bundle purchase SQL avoids `JSON_TABLE` so the XAMPP/MariaDB setup can run `ProcessBundlePurchase` successfully.
 
 
 ## Password security strategy

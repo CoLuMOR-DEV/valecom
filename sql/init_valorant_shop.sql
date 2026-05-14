@@ -238,7 +238,10 @@ CREATE PROCEDURE ProcessBundlePurchase(
   IN p_skin_ids_json JSON
 )
 BEGIN
-  DECLARE current_vp INT;
+  DECLARE current_vp INT DEFAULT NULL;
+  DECLARE skin_count INT DEFAULT 0;
+  DECLARE skin_index INT DEFAULT 0;
+  DECLARE next_skin_id VARCHAR(100) DEFAULT NULL;
 
   DECLARE EXIT HANDLER FOR SQLEXCEPTION
   BEGIN
@@ -261,6 +264,12 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Bundle price should be positive';
   END IF;
 
+  SET skin_count = IFNULL(JSON_LENGTH(p_skin_ids_json), 0);
+
+  IF skin_count <= 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Bundle must include at least one skin';
+  END IF;
+
   IF current_vp < p_price_vp THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Insufficient VP balance for bundle';
   END IF;
@@ -269,10 +278,17 @@ BEGIN
   SET VP_Balance = VP_Balance - p_price_vp
   WHERE ID = p_user_id;
 
-  INSERT INTO OwnedSkins (UserID, SkinID, LevelUnlocked)
-  SELECT p_user_id, ids.skin_id, 1
-  FROM JSON_TABLE(p_skin_ids_json, '$[*]' COLUMNS (skin_id VARCHAR(100) PATH '$')) ids
-  ON DUPLICATE KEY UPDATE LevelUnlocked = GREATEST(LevelUnlocked, VALUES(LevelUnlocked));
+  WHILE skin_index < skin_count DO
+    SET next_skin_id = JSON_UNQUOTE(JSON_EXTRACT(p_skin_ids_json, CONCAT('$[', skin_index, ']')));
+
+    IF next_skin_id IS NOT NULL AND next_skin_id <> '' THEN
+      INSERT INTO OwnedSkins (UserID, SkinID, LevelUnlocked)
+      VALUES (p_user_id, next_skin_id, 1)
+      ON DUPLICATE KEY UPDATE LevelUnlocked = GREATEST(LevelUnlocked, VALUES(LevelUnlocked));
+    END IF;
+
+    SET skin_index = skin_index + 1;
+  END WHILE;
 
   INSERT INTO Transactions (UserID, SkinID, PurchasedLevel, VP_Cost, TransactionType)
   VALUES (p_user_id, CONCAT('BUNDLE:', p_bundle_id), 1, p_price_vp, 'BUNDLE');
