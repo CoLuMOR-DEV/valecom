@@ -5,7 +5,9 @@ erDiagram
     Users ||--o{ OwnedSkins : owns
     Users ||--o{ Transactions : makes
     Users ||--o{ LoadoutSelections : equips
-    Users ||--o{ AuditLogs : logs
+    Users ||--o{ AuditLogs : generates
+    SkinCatalog ||--o{ BundleSkins : included_as
+    Bundles ||--o{ BundleSkins : contains
 
     Users {
       int ID PK
@@ -14,6 +16,45 @@ erDiagram
       varchar PasswordHash "bcrypt hash"
       int VP_Balance "CHECK >= 0"
       boolean IsAdmin
+      timestamp CreatedAt
+    }
+
+    SkinCatalog {
+      varchar SkinID PK
+      varchar SkinName
+      varchar WeaponName
+      varchar CollectionName
+      varchar RarityTier
+      text DisplayIcon
+      text ShowcaseImage
+      int BasePriceVP "CHECK >= 0"
+      boolean IsActive
+      timestamp UpdatedAt
+    }
+
+    Bundles {
+      varchar BundleID PK
+      varchar BundleName
+      text DisplayIcon
+      int PriceVP "CHECK > 0"
+      boolean Available
+      timestamp StartsAt
+      timestamp EndsAt
+      timestamp UpdatedAt
+    }
+
+    BundleSkins {
+      varchar BundleID PK, FK
+      varchar SkinID PK, FK
+      int SortOrder
+    }
+
+    TopupPackages {
+      int PackageID PK
+      int VPAmount UK
+      decimal PriceUSD
+      int BonusVP
+      boolean IsActive
       timestamp CreatedAt
     }
 
@@ -54,10 +95,11 @@ erDiagram
 
 ## Notes
 - `OwnedSkins` stores all purchased skins for each user, with uniqueness on `(UserID, SkinID)`.
-- `Transactions` stores topups and purchases (`PURCHASE`, `BUNDLE`, `TOPUP`).
+- `Transactions` stores top-ups and purchases (`PURCHASE`, `BUNDLE`, `TOPUP`).
 - `LoadoutSelections` stores equipped skin per weapon slot per user, with uniqueness on `(UserID, WeaponSlot)`.
 - `AuditLogs` stores trigger-based transaction/loadout audit entries.
-- `UpgradePricing` was removed from the schema.
+- `SkinCatalog`, `Bundles`, and `BundleSkins` model the optional local shop catalog/cache and the M:N relationship between bundles and skins.
+- `TopupPackages` stores the VP packages used by the top-up flow and by `RecommendedTopupVP`.
 
 ## DB Logic Layer (from `init_valorant_shop.sql`)
 
