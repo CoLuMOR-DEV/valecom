@@ -13,6 +13,56 @@ CREATE TABLE IF NOT EXISTS Users (
   CONSTRAINT chk_users_vp_non_negative CHECK (VP_Balance >= 0)
 );
 
+CREATE TABLE IF NOT EXISTS SkinCatalog (
+  SkinID VARCHAR(100) PRIMARY KEY,
+  SkinName VARCHAR(160) NOT NULL,
+  WeaponName VARCHAR(80) NOT NULL,
+  CollectionName VARCHAR(120) NULL,
+  RarityTier VARCHAR(60) NULL,
+  DisplayIcon TEXT NULL,
+  ShowcaseImage TEXT NULL,
+  BasePriceVP INT NOT NULL DEFAULT 875,
+  IsActive BOOLEAN NOT NULL DEFAULT TRUE,
+  UpdatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_skin_catalog_weapon (WeaponName),
+  INDEX idx_skin_catalog_collection (CollectionName),
+  CONSTRAINT chk_skin_catalog_price_non_negative CHECK (BasePriceVP >= 0)
+);
+
+CREATE TABLE IF NOT EXISTS Bundles (
+  BundleID VARCHAR(100) PRIMARY KEY,
+  BundleName VARCHAR(160) NOT NULL,
+  DisplayIcon TEXT NULL,
+  PriceVP INT NOT NULL,
+  Available BOOLEAN NOT NULL DEFAULT TRUE,
+  StartsAt TIMESTAMP NULL,
+  EndsAt TIMESTAMP NULL,
+  UpdatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_bundles_available (Available, EndsAt),
+  CONSTRAINT chk_bundles_price_positive CHECK (PriceVP > 0)
+);
+
+CREATE TABLE IF NOT EXISTS BundleSkins (
+  BundleID VARCHAR(100) NOT NULL,
+  SkinID VARCHAR(100) NOT NULL,
+  SortOrder INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (BundleID, SkinID),
+  INDEX idx_bundle_skins_skin (SkinID),
+  CONSTRAINT fk_bundle_skins_bundle FOREIGN KEY (BundleID) REFERENCES Bundles(BundleID),
+  CONSTRAINT fk_bundle_skins_skin FOREIGN KEY (SkinID) REFERENCES SkinCatalog(SkinID)
+);
+
+CREATE TABLE IF NOT EXISTS TopupPackages (
+  PackageID INT PRIMARY KEY AUTO_INCREMENT,
+  VPAmount INT NOT NULL UNIQUE,
+  PriceUSD DECIMAL(8,2) NOT NULL,
+  BonusVP INT NOT NULL DEFAULT 0,
+  IsActive BOOLEAN NOT NULL DEFAULT TRUE,
+  CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT chk_topup_package_vp_positive CHECK (VPAmount > 0),
+  CONSTRAINT chk_topup_package_price_positive CHECK (PriceUSD >= 0)
+);
+
 CREATE TABLE IF NOT EXISTS OwnedSkins (
   OwnedSkinID INT PRIMARY KEY AUTO_INCREMENT,
   UserID INT NOT NULL,
@@ -20,6 +70,7 @@ CREATE TABLE IF NOT EXISTS OwnedSkins (
   LevelUnlocked INT NOT NULL DEFAULT 1,
   UpdatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY unique_user_skin (UserID, SkinID),
+  INDEX idx_owned_skins_skin (SkinID),
   CONSTRAINT fk_owned_user FOREIGN KEY (UserID) REFERENCES Users(ID),
   CONSTRAINT chk_owned_level_positive CHECK (LevelUnlocked >= 1)
 );
@@ -69,6 +120,14 @@ WHERE ID = 1 AND Username = 'demo_user';
 UPDATE Users
 SET PasswordHash = '$2b$10$ERDRtguMjPf4jiBHUwc5xeMhM5.L8gQ0EfqzieDdXXU8il8AKyixu', IsAdmin = TRUE
 WHERE ID = 2 AND Username = 'admin_user';
+
+INSERT IGNORE INTO TopupPackages (VPAmount, PriceUSD, BonusVP, IsActive) VALUES
+(475, 4.99, 0, TRUE),
+(1000, 9.99, 50, TRUE),
+(2050, 19.99, 150, TRUE),
+(3650, 34.99, 300, TRUE),
+(5350, 49.99, 600, TRUE),
+(11000, 99.99, 1500, TRUE);
 
 DELIMITER $$
 

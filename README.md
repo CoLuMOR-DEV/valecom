@@ -30,6 +30,10 @@
    - `http://localhost:3000/loadout` (loadout)
    - `http://localhost:3000/admin` (admin table)
 
+## Database report
+- Coursework-ready report: `docs/ECOMMERCE_DATABASE_REPORT.md`.
+- ERD source: `sql/ERD.md`.
+
 ## API map
 - `GET /api/shop` → featured + daily skin data from Valorant API.
 - `GET /api/user/1` → live VP balance + owned skins.
